@@ -14,7 +14,7 @@ export const GLITCH_FRAMES = 5;
 
 const TITLE_SECONDS = 2;
 const NUMBERS_SECONDS = 3;
-const BEFORE_AFTER_SECONDS = 4;
+const DIFF_STATS_SECONDS = 4;
 const BOSS_SECONDS = 3;
 const WRAPPED_SECONDS = 5;
 const OUTRO_SECONDS = 3;
@@ -56,8 +56,8 @@ export const computeHypeConfig = (
   const numbers = timing(cursor, NUMBERS_SECONDS);
   cursor += numbers.durationInFrames;
 
-  const beforeAfter = timing(cursor, BEFORE_AFTER_SECONDS);
-  cursor += beforeAfter.durationInFrames;
+  const diffStats = timing(cursor, DIFF_STATS_SECONDS);
+  cursor += diffStats.durationInFrames;
 
   const timelapse = timing(cursor, timelapseSec);
   cursor += timelapse.durationInFrames;
@@ -74,7 +74,7 @@ export const computeHypeConfig = (
   const timings: HypeSceneTimings = {
     title,
     numbers,
-    beforeAfter,
+    diffStats,
     timelapse,
     boss,
     wrapped,

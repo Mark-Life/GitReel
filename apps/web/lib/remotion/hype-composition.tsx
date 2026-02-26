@@ -3,30 +3,25 @@
 import { AbsoluteFill, Sequence } from "remotion";
 import { GlitchTransition } from "./effects/glitch-transition";
 import { computeHypeConfig, GLITCH_FRAMES } from "./hype-config";
-import { BeforeAfter } from "./scenes/before-after";
 import { BossEntry } from "./scenes/boss-entry";
+import { DiffStats } from "./scenes/diff-stats";
+import { FileTreeTimelapse } from "./scenes/file-tree-timelapse";
 import { HypeOutro } from "./scenes/hype-outro";
 import { HypeTitle } from "./scenes/hype-title";
 import { NumberSlam } from "./scenes/number-slam";
-import { TreemapTimelapse } from "./scenes/treemap-timelapse";
 import { WrappedCard } from "./scenes/wrapped-card";
 import type { GitReelProps } from "./types";
 
 /** Hype-style GitReel composition — TikTok energy sequence */
 export function HypeComposition({ timeline, keyframes }: GitReelProps) {
-  const { timings, treemapWidth, treemapHeight } = computeHypeConfig(
-    timeline,
-    keyframes
-  );
+  const { timings } = computeHypeConfig(timeline, keyframes);
 
   const fps = 30;
-  const firstRects = keyframes[0]?.rects ?? [];
-  const lastRects = keyframes.at(-1)?.rects ?? [];
 
   const scenes = [
     timings.title,
     timings.numbers,
-    timings.beforeAfter,
+    timings.diffStats,
     timings.timelapse,
     timings.boss,
     timings.wrapped,
@@ -57,32 +52,24 @@ export function HypeComposition({ timeline, keyframes }: GitReelProps) {
         />
       </Sequence>
 
-      {/* Before/After treemap */}
+      {/* Diff stats — significant commits */}
       <Sequence
-        durationInFrames={timings.beforeAfter.durationInFrames}
-        from={timings.beforeAfter.from}
+        durationInFrames={timings.diffStats.durationInFrames}
+        from={timings.diffStats.from}
         premountFor={fps}
       >
-        <BeforeAfter
-          firstRects={firstRects}
-          lastRects={lastRects}
-          treemapHeight={treemapHeight}
-          treemapWidth={treemapWidth}
-        />
+        <DiffStats commits={timeline.commits} keyframes={keyframes} />
       </Sequence>
 
-      {/* Timelapse */}
+      {/* File tree timelapse */}
       <Sequence
         durationInFrames={timings.timelapse.durationInFrames}
         from={timings.timelapse.from}
         premountFor={fps}
       >
-        <TreemapTimelapse
-          commits={timeline.commits}
+        <FileTreeTimelapse
           keyframes={keyframes}
           totalCommits={timeline.totalCommits}
-          treemapHeight={treemapHeight}
-          treemapWidth={treemapWidth}
         />
       </Sequence>
 

@@ -8,6 +8,8 @@ import { HypeComposition } from "../../../lib/remotion/hype-composition";
 import { computeHypeConfig } from "../../../lib/remotion/hype-config";
 import { CodeRain } from "../../../lib/remotion/scenes/code-rain";
 import { ContributorGrid } from "../../../lib/remotion/scenes/contributor-grid";
+import { DiffStats } from "../../../lib/remotion/scenes/diff-stats";
+import { FileTreeTimelapse } from "../../../lib/remotion/scenes/file-tree-timelapse";
 import { HypeTitle } from "../../../lib/remotion/scenes/hype-title";
 import { LanguagePie } from "../../../lib/remotion/scenes/language-pie";
 import { NumberSlam } from "../../../lib/remotion/scenes/number-slam";
@@ -15,6 +17,8 @@ import { PulseRing } from "../../../lib/remotion/scenes/pulse-ring";
 import type {
   CodeRainProps,
   ContributorGridProps,
+  DiffStatsProps,
+  FileTreeTimelapseProps,
   GitReelProps,
   HypeTitleProps,
   LanguagePieProps,
@@ -45,6 +49,10 @@ const HypeTitleComponent = HypeTitle as unknown as FC<Record<string, unknown>>;
 const NumberSlamComponent = NumberSlam as unknown as FC<
   Record<string, unknown>
 >;
+const FileTreeTimelapseComponent = FileTreeTimelapse as unknown as FC<
+  Record<string, unknown>
+>;
+const DiffStatsComponent = DiffStats as unknown as FC<Record<string, unknown>>;
 const HypeCompositionComponent = HypeComposition as unknown as FC<
   Record<string, unknown>
 >;
@@ -176,6 +184,15 @@ function ReadyView({
     contributorCount: timeline.contributors.length,
   };
 
+  const fileTreeProps: FileTreeTimelapseProps = {
+    keyframes,
+    totalCommits: timeline.totalCommits,
+  };
+  const diffStatsProps: DiffStatsProps = {
+    keyframes,
+    commits: timeline.commits,
+  };
+
   const pieProps: LanguagePieProps = { languages: timeline.languages };
   const gridProps: ContributorGridProps = {
     contributors: timeline.contributors,
@@ -221,6 +238,18 @@ function ReadyView({
           label="Number Slam"
         />
         <ScenePlayer
+          component={DiffStatsComponent}
+          durationInFrames={120}
+          inputProps={diffStatsProps}
+          label="Diff Stats"
+        />
+        <ScenePlayer
+          component={FileTreeTimelapseComponent}
+          durationInFrames={300}
+          inputProps={fileTreeProps}
+          label="File Tree Timelapse"
+        />
+        <ScenePlayer
           component={LanguagePieComponent}
           durationInFrames={120}
           inputProps={pieProps}
@@ -257,13 +286,7 @@ function ScenePlayer({
 }: {
   component: FC<Record<string, unknown>>;
   durationInFrames: number;
-  inputProps:
-    | LanguagePieProps
-    | ContributorGridProps
-    | PulseRingProps
-    | CodeRainProps
-    | HypeTitleProps
-    | NumberSlamProps;
+  inputProps: Record<string, unknown>;
   label: string;
 }) {
   return (

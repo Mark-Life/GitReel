@@ -154,9 +154,19 @@ export interface GlitchTransitionProps {
   durationInFrames: number;
 }
 
+export interface FileTreeTimelapseProps {
+  keyframes: TreemapKeyframe[];
+  totalCommits: number;
+}
+
+export interface DiffStatsProps {
+  commits: VideoTimelineCommit[];
+  keyframes: TreemapKeyframe[];
+}
+
 export interface HypeSceneTimings {
-  beforeAfter: SceneTiming;
   boss: SceneTiming;
+  diffStats: SceneTiming;
   numbers: SceneTiming;
   outro: SceneTiming;
   timelapse: SceneTiming;
