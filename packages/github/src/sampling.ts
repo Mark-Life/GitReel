@@ -1,4 +1,4 @@
-import type { TimelineCommit } from "./types.js";
+import type { TimelineCommit } from "./types";
 
 const SECONDS_PER_MINUTE = 60;
 const MINUTES_PER_HOUR = 60;

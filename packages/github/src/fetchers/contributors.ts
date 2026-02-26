@@ -1,8 +1,8 @@
 import { Effect } from "effect";
-import { OctokitClient } from "../client.js";
-import { mapOctokitError } from "../errors.js";
-import type { GitHubLogin } from "../types.js";
-import { Contributor } from "../types.js";
+import { OctokitClient } from "../client";
+import { mapOctokitError } from "../errors";
+import type { GitHubLogin } from "../types";
+import { Contributor } from "../types";
 
 const MAX_CONTRIBUTORS = 200;
 const MAX_PAGES = 2;

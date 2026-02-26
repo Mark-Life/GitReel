@@ -1,7 +1,7 @@
 import { Effect } from "effect";
-import { OctokitClient } from "../client.js";
-import { mapOctokitError } from "../errors.js";
-import type { LanguageBreakdown } from "../types.js";
+import { OctokitClient } from "../client";
+import { mapOctokitError } from "../errors";
+import type { LanguageBreakdown } from "../types";
 
 /** Fetches language breakdown (bytes per language) */
 export const fetchLanguages = Effect.fn("fetchLanguages")(function* (

@@ -1,46 +1,47 @@
 import { ORPCError, os } from "@orpc/server";
 import { fetchRepoTimeline, OctokitClient } from "@workspace/github";
-import { Effect } from "effect";
+import { Effect, Either } from "effect";
 import { z } from "zod";
 
 const health = {
   check: os.handler(async () => ({ status: "ok" as const })),
 };
 
+const throwMappedError = (error: { readonly _tag: string }): never => {
+  const e = error as Record<string, unknown>;
+  switch (error._tag) {
+    case "RepoNotFound":
+      throw new ORPCError("NOT_FOUND", {
+        message: `Repository ${e.owner}/${e.repo} not found`,
+      });
+    case "RateLimited":
+      throw new ORPCError("TOO_MANY_REQUESTS", {
+        message: "GitHub API rate limit exceeded",
+      });
+    case "InvalidRepoUrl":
+      throw new ORPCError("BAD_REQUEST", {
+        message: `Invalid repository URL: ${e.input}`,
+      });
+    default:
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
+        message: typeof e.message === "string" ? e.message : "Unknown error",
+      });
+  }
+};
+
 const github = {
   getTimeline: os
     .input(z.object({ url: z.string().min(1) }))
-    .handler(({ input }) => {
+    .handler(async ({ input }) => {
       const program = fetchRepoTimeline(input.url).pipe(
-        Effect.catchTags({
-          RepoNotFound: (e) =>
-            Effect.fail(
-              new ORPCError("NOT_FOUND", {
-                message: `Repository ${e.owner}/${e.repo} not found`,
-              })
-            ),
-          RateLimited: () =>
-            Effect.fail(
-              new ORPCError("TOO_MANY_REQUESTS", {
-                message: "GitHub API rate limit exceeded",
-              })
-            ),
-          GitHubApiError: (e) =>
-            Effect.fail(
-              new ORPCError("INTERNAL_SERVER_ERROR", {
-                message: e.message,
-              })
-            ),
-          InvalidRepoUrl: (e) =>
-            Effect.fail(
-              new ORPCError("BAD_REQUEST", {
-                message: `Invalid repository URL: ${e.input}`,
-              })
-            ),
-        }),
         Effect.provide(OctokitClient.Default)
       );
-      return Effect.runPromise(program);
+      const result = await Effect.runPromise(Effect.either(program));
+
+      return Either.match(result, {
+        onLeft: (error) => throwMappedError(error),
+        onRight: (timeline) => timeline,
+      });
     }),
 };
 

@@ -1,12 +1,12 @@
 import { Effect } from "effect";
-import { fetchCommits } from "./fetchers/commits.js";
-import { fetchContributors } from "./fetchers/contributors.js";
-import { fetchLanguages } from "./fetchers/languages.js";
-import { fetchRepo } from "./fetchers/repo.js";
-import { fetchTree } from "./fetchers/trees.js";
-import { parseRepoUrl } from "./parser.js";
-import { sampleCommits } from "./sampling.js";
-import { RepoTimeline } from "./types.js";
+import { fetchCommits } from "./fetchers/commits";
+import { fetchContributors } from "./fetchers/contributors";
+import { fetchLanguages } from "./fetchers/languages";
+import { fetchRepo } from "./fetchers/repo";
+import { fetchTree } from "./fetchers/trees";
+import { parseRepoUrl } from "./parser";
+import { sampleCommits } from "./sampling";
+import { RepoTimeline } from "./types";
 
 /** Fetches all data for a repo and assembles a RepoTimeline */
 export const fetchRepoTimeline = Effect.fn("fetchRepoTimeline")(function* (

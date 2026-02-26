@@ -1,11 +1,11 @@
-export { OctokitClient } from "./client.js";
+export { OctokitClient } from "./client";
 export {
   GitHubApiError,
   InvalidRepoUrl,
   RateLimited,
   RepoNotFound,
-} from "./errors.js";
-export { fetchRepoTimeline } from "./timeline.js";
+} from "./errors";
+export { fetchRepoTimeline } from "./timeline";
 export type {
   CommitAuthor,
   CommitSha,
@@ -17,4 +17,4 @@ export type {
   TimelineCommit,
   TreeFile,
   TreeSnapshot,
-} from "./types.js";
+} from "./types";

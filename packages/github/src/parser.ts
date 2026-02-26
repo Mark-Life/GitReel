@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { InvalidRepoUrl } from "./errors.js";
+import { InvalidRepoUrl } from "./errors";
 
 const URL_REGEX =
   /^(?:https?:\/\/)?(?:www\.)?github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/.*)?$/;

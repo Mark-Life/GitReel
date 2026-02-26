@@ -1,8 +1,8 @@
 import { Effect } from "effect";
-import { OctokitClient } from "../client.js";
-import { mapOctokitError } from "../errors.js";
-import type { CommitSha } from "../types.js";
-import { type TimelineCommit, TreeFile, TreeSnapshot } from "../types.js";
+import { OctokitClient } from "../client";
+import { mapOctokitError } from "../errors";
+import type { CommitSha } from "../types";
+import { type TimelineCommit, TreeFile, TreeSnapshot } from "../types";
 
 const EXT_MAP: Record<string, string> = {
   ".ts": "TypeScript",

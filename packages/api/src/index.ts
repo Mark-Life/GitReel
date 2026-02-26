@@ -1,3 +1,3 @@
-export { createClient } from "./client.js";
-export type { Router } from "./router.js";
-export { router } from "./router.js";
+export { createClient } from "./client";
+export type { Router } from "./router";
+export { router } from "./router";

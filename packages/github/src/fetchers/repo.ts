@@ -1,7 +1,7 @@
 import { Effect } from "effect";
-import { OctokitClient } from "../client.js";
-import { mapOctokitError } from "../errors.js";
-import { RepoMeta } from "../types.js";
+import { OctokitClient } from "../client";
+import { mapOctokitError } from "../errors";
+import { RepoMeta } from "../types";
 
 /** Fetches repository metadata */
 export const fetchRepo = Effect.fn("fetchRepo")(function* (

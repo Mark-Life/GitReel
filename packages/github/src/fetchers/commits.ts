@@ -1,8 +1,8 @@
 import { Effect } from "effect";
-import { OctokitClient } from "../client.js";
-import { mapOctokitError } from "../errors.js";
-import type { CommitSha, GitHubLogin } from "../types.js";
-import { CommitAuthor, TimelineCommit } from "../types.js";
+import { OctokitClient } from "../client";
+import { mapOctokitError } from "../errors";
+import type { CommitSha, GitHubLogin } from "../types";
+import { CommitAuthor, TimelineCommit } from "../types";
 
 const MAX_PAGES = 50;
 
