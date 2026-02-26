@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "effect-client-wrapper": {
+      "source": "rhyssullivan/effect-client-wrapper-skill",
+      "sourceType": "github",
+      "computedHash": "0b9dfa4fdd02e88d979f4d592fc7fd71305d224b36ca4753e5c4b50022c93daf"
+    }
+  }
+}
