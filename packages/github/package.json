@@ -1,21 +1,17 @@
 {
-  "name": "@workspace/api",
+  "name": "@workspace/github",
   "version": "0.0.0",
   "type": "module",
   "private": true,
   "dependencies": {
-    "@orpc/client": "^1.13.5",
-    "@orpc/server": "^1.13.5",
-    "@workspace/github": "workspace:*",
     "effect": "^3.16.0",
-    "zod": "^4.3.6"
+    "octokit": "^4.1.2"
   },
   "devDependencies": {
     "@workspace/typescript-config": "workspace:*",
     "typescript": "^5.9.3"
   },
   "exports": {
-    "./router": "./src/router.ts",
-    "./client": "./src/client.ts"
+    ".": "./src/index.ts"
   }
 }
