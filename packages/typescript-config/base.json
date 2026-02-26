@@ -17,6 +17,12 @@
     "noImplicitOverride": true,
     "sourceMap": true,
     "strict": true,
-    "target": "ES2022"
+    "exactOptionalPropertyTypes": true,
+    "target": "ES2022",
+    "plugins": [
+      {
+        "name": "@effect/language-service"
+      }
+    ]
   }
 }
