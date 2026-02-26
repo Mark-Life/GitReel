@@ -2,17 +2,28 @@
 
 import { Player } from "@remotion/player";
 import { createClient } from "@workspace/api/client";
-import { type FC, type FormEvent, useCallback, useState } from "react";
+import { type FC, type FormEvent, useCallback, useMemo, useState } from "react";
 import { toVideoTimeline } from "../../../lib/remotion/convert";
+import { HypeComposition } from "../../../lib/remotion/hype-composition";
+import { computeHypeConfig } from "../../../lib/remotion/hype-config";
+import { CodeRain } from "../../../lib/remotion/scenes/code-rain";
 import { ContributorGrid } from "../../../lib/remotion/scenes/contributor-grid";
+import { HypeTitle } from "../../../lib/remotion/scenes/hype-title";
 import { LanguagePie } from "../../../lib/remotion/scenes/language-pie";
+import { NumberSlam } from "../../../lib/remotion/scenes/number-slam";
 import { PulseRing } from "../../../lib/remotion/scenes/pulse-ring";
 import type {
+  CodeRainProps,
   ContributorGridProps,
+  GitReelProps,
+  HypeTitleProps,
   LanguagePieProps,
+  NumberSlamProps,
   PulseRingProps,
   VideoTimeline,
 } from "../../../lib/remotion/types";
+import { computeAllKeyframes } from "../../../lib/video/treemap";
+import type { TreemapKeyframe } from "../../../lib/video/types";
 
 const DEFAULT_URL = "https://github.com/Mark-Life/GitReel";
 
@@ -29,11 +40,19 @@ const ContributorGridComponent = ContributorGrid as unknown as FC<
   Record<string, unknown>
 >;
 const PulseRingComponent = PulseRing as unknown as FC<Record<string, unknown>>;
+const CodeRainComponent = CodeRain as unknown as FC<Record<string, unknown>>;
+const HypeTitleComponent = HypeTitle as unknown as FC<Record<string, unknown>>;
+const NumberSlamComponent = NumberSlam as unknown as FC<
+  Record<string, unknown>
+>;
+const HypeCompositionComponent = HypeComposition as unknown as FC<
+  Record<string, unknown>
+>;
 
 type State =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "ready"; timeline: VideoTimeline }
+  | { status: "ready"; timeline: VideoTimeline; keyframes: TreemapKeyframe[] }
   | { status: "error"; message: string };
 
 export default function VisualsTestPage() {
@@ -49,7 +68,8 @@ export default function VisualsTestPage() {
         const client = createClient(window.location.origin);
         const repo = await client.github.getTimeline({ url });
         const timeline = toVideoTimeline(repo);
-        setState({ status: "ready", timeline });
+        const keyframes = computeAllKeyframes(repo.snapshots);
+        setState({ status: "ready", timeline, keyframes });
       } catch (err) {
         setState({
           status: "error",
@@ -125,38 +145,106 @@ export default function VisualsTestPage() {
         <p style={{ color: "#ef4444" }}>Error: {state.message}</p>
       )}
 
-      {state.status === "ready" && <ReadyView timeline={state.timeline} />}
+      {state.status === "ready" && (
+        <ReadyView keyframes={state.keyframes} timeline={state.timeline} />
+      )}
     </div>
   );
 }
 
-function ReadyView({ timeline }: { timeline: VideoTimeline }) {
+function ReadyView({
+  timeline,
+  keyframes,
+}: {
+  keyframes: TreemapKeyframe[];
+  timeline: VideoTimeline;
+}) {
+  const { config } = useMemo(
+    () => computeHypeConfig(timeline, keyframes),
+    [timeline, keyframes]
+  );
+
+  const hypeProps: GitReelProps = useMemo(
+    () => ({ timeline, keyframes }),
+    [timeline, keyframes]
+  );
+
+  const titleProps: HypeTitleProps = { meta: timeline.meta };
+  const numberProps: NumberSlamProps = {
+    totalCommits: timeline.totalCommits,
+    stars: timeline.meta.stars,
+    contributorCount: timeline.contributors.length,
+  };
+
   const pieProps: LanguagePieProps = { languages: timeline.languages };
   const gridProps: ContributorGridProps = {
     contributors: timeline.contributors,
   };
   const pulseProps: PulseRingProps = { commits: timeline.commits };
+  const rainProps: CodeRainProps = { commits: timeline.commits };
 
   return (
-    <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
-      <ScenePlayer
-        component={LanguagePieComponent}
-        durationInFrames={120}
-        inputProps={pieProps}
-        label="Language Pie"
+    <div>
+      {/* Full Hype Composition */}
+      <h2 style={{ fontSize: 16, marginBottom: 12 }}>Hype Composition</h2>
+      <Player
+        acknowledgeRemotionLicense
+        component={HypeCompositionComponent}
+        compositionHeight={COMP_HEIGHT}
+        compositionWidth={COMP_WIDTH}
+        controls
+        durationInFrames={config.durationInFrames}
+        fps={config.fps}
+        inputProps={hypeProps as unknown as Record<string, unknown>}
+        loop
+        style={{
+          width: 270,
+          height: 480,
+          borderRadius: 12,
+          marginBottom: 40,
+        }}
       />
-      <ScenePlayer
-        component={ContributorGridComponent}
-        durationInFrames={150}
-        inputProps={gridProps}
-        label="Contributor Grid"
-      />
-      <ScenePlayer
-        component={PulseRingComponent}
-        durationInFrames={120}
-        inputProps={pulseProps}
-        label="Pulse Ring"
-      />
+
+      {/* Individual scene previews */}
+      <h2 style={{ fontSize: 16, marginBottom: 12 }}>Individual Scenes</h2>
+      <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
+        <ScenePlayer
+          component={HypeTitleComponent}
+          durationInFrames={60}
+          inputProps={titleProps}
+          label="Hype Title"
+        />
+        <ScenePlayer
+          component={NumberSlamComponent}
+          durationInFrames={90}
+          inputProps={numberProps}
+          label="Number Slam"
+        />
+        <ScenePlayer
+          component={LanguagePieComponent}
+          durationInFrames={120}
+          inputProps={pieProps}
+          label="Language Pie"
+        />
+        <ScenePlayer
+          component={ContributorGridComponent}
+          durationInFrames={150}
+          inputProps={gridProps}
+          label="Contributor Grid"
+        />
+        <ScenePlayer
+          component={PulseRingComponent}
+          durationInFrames={120}
+          inputProps={pulseProps}
+          label="Pulse Ring"
+        />
+        <ScenePlayer
+          component={CodeRainComponent}
+          durationInFrames={90}
+          inputProps={rainProps}
+          label="Code Rain"
+        />
+      </div>
     </div>
   );
 }
@@ -169,7 +257,13 @@ function ScenePlayer({
 }: {
   component: FC<Record<string, unknown>>;
   durationInFrames: number;
-  inputProps: LanguagePieProps | ContributorGridProps | PulseRingProps;
+  inputProps:
+    | LanguagePieProps
+    | ContributorGridProps
+    | PulseRingProps
+    | CodeRainProps
+    | HypeTitleProps
+    | NumberSlamProps;
   label: string;
 }) {
   return (

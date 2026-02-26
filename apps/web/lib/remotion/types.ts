@@ -1,4 +1,4 @@
-import type { TreemapKeyframe } from "../video/types";
+import type { TreemapKeyframe, TreemapRect } from "../video/types";
 
 /** POJO mirror of RepoMeta (no Effect Schema classes) */
 export interface VideoRepoMeta {
@@ -108,8 +108,58 @@ export interface PulseRingProps {
   commits: VideoTimelineCommit[];
 }
 
+export interface CodeRainProps {
+  commits: VideoTimelineCommit[];
+}
+
 /** Master composition inputProps */
 export interface GitReelProps {
   keyframes: TreemapKeyframe[];
   timeline: VideoTimeline;
+}
+
+/* ── Hype composition types ─────────────────────────────── */
+
+export interface HypeTitleProps {
+  meta: VideoRepoMeta;
+}
+
+export interface NumberSlamProps {
+  contributorCount: number;
+  linesOfCode?: number;
+  stars: number;
+  totalCommits: number;
+}
+
+export interface BeforeAfterProps {
+  firstRects: TreemapRect[];
+  lastRects: TreemapRect[];
+  treemapHeight: number;
+  treemapWidth: number;
+}
+
+export interface BossEntryProps {
+  contributors: VideoContributor[];
+}
+
+export interface WrappedCardProps {
+  timeline: VideoTimeline;
+}
+
+export interface HypeOutroProps {
+  repoName: string;
+}
+
+export interface GlitchTransitionProps {
+  durationInFrames: number;
+}
+
+export interface HypeSceneTimings {
+  beforeAfter: SceneTiming;
+  boss: SceneTiming;
+  numbers: SceneTiming;
+  outro: SceneTiming;
+  timelapse: SceneTiming;
+  title: SceneTiming;
+  wrapped: SceneTiming;
 }

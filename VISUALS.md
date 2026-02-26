@@ -227,22 +227,24 @@ Total: ~75-90s (would need to trim/select subset). Pick top 4-5 most impactful s
 
 ## Priority for Implementation
 
-| # | Scene | Effort | Visual Impact | Data Ready? |
-|---|-------|--------|---------------|-------------|
-| 4 | Language Pie Chart | Low | Medium | Yes |
-| 2 | Contributor Grid | Low | High | Yes |
-| 13 | Pulse Ring Heartbeat | Low | Medium | Yes |
-| 5 | Commit Velocity Graph | Medium | High | Yes (needs bucketing) |
-| 3 | Commit Heatmap | Medium | High | Yes (needs bucketing) |
-| 8 | Code Rain | Low | Medium | Yes |
-| 14 | First->Latest Journey | Medium | High | Yes |
-| 1 | Star History | Medium | High | No (needs new API call) |
-| 9 | Top Files Leaderboard | Medium | High | Partial (need per-snapshot sizes) |
-| 12 | Word Cloud | Medium | Medium | Yes (needs NLP filtering) |
-| 10 | Contributor Timeline | Medium | Medium | Yes (needs bucketing) |
-| 6 | File Type Explosion | Medium | High | Yes |
-| 11 | Sunburst | High | High | Yes |
-| 15 | Release Timeline | Medium | Medium | No (needs new API call) |
-| 7 | Branch Graph | High | High | No (needs commit parent data) |
+
+| #   | Scene                 | Effort | Visual Impact | Data Ready?                       | Status |
+| --- | --------------------- | ------ | ------------- | --------------------------------- | ------ |
+| 4   | Language Pie Chart    | Low    | Medium        | Yes                               | Done   |
+| 2   | Contributor Grid      | Low    | High          | Yes                               | Done   |
+| 13  | Pulse Ring Heartbeat  | Low    | Medium        | Yes                               | Done   |
+| 5   | Commit Velocity Graph | Medium | High          | Yes (needs bucketing)             |        |
+| 3   | Commit Heatmap        | Medium | High          | Yes (needs bucketing)             |        |
+| 8   | Code Rain             | Low    | Medium        | Yes                               | Done   |
+| 14  | First->Latest Journey | Medium | High          | Yes                               |        |
+| 1   | Star History          | Medium | High          | No (needs new API call)           |        |
+| 9   | Top Files Leaderboard | Medium | High          | Partial (need per-snapshot sizes) |        |
+| 12  | Word Cloud            | Medium | Medium        | Yes (needs NLP filtering)         |        |
+| 10  | Contributor Timeline  | Medium | Medium        | Yes (needs bucketing)             |        |
+| 6   | File Type Explosion   | Medium | High          | Yes                               |        |
+| 11  | Sunburst              | High   | High          | Yes                               |        |
+| 15  | Release Timeline      | Medium | Medium        | No (needs new API call)           |        |
+| 7   | Branch Graph          | High   | High          | No (needs commit parent data)     |        |
+
 
 Start with top 4-5 (Language Pie, Contributor Grid, Pulse Ring, Commit Velocity, Heatmap) — all use existing data with minimal processing.
