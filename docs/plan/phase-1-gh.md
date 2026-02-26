@@ -53,9 +53,9 @@ packages/api/                     # ✅ DONE — oRPC router + typed client
 packages/github/
   src/
     index.ts              # public exports
-    client.ts             # OctokitClient Effect service
+    client.ts             # OctokitClient Effect service ("use" pattern wrapper)
     parser.ts             # URL/slug parser → { owner, repo }
-    errors.ts             # all error types (Effect Data.TaggedError)
+    errors.ts             # all error types (Effect Schema.TaggedError)
     fetchers/
       repo.ts             # repo metadata
       commits.ts          # commit history (paginated)
@@ -64,7 +64,7 @@ packages/github/
       contributors.ts     # contributor list
     sampling.ts           # commit sampling strategies
     timeline.ts           # orchestrator: composes all fetchers → RepoTimeline
-    types.ts              # all data types
+    types.ts              # all data types (Schema.Class + branded primitives)
   package.json
   tsconfig.json
 
@@ -103,81 +103,159 @@ Browser                          Server (Next.js)                packages/github
 
 ## Effect Error Types (`errors.ts`)
 
+Use `Schema.TaggedError` — serializable over the network, yieldable without `Effect.fail()`, built-in `_tag` for `catchTag`. Use `Schema.Defect` to wrap unknown errors from Octokit.
+
 ```ts
-import { Data } from "effect"
+import { Schema } from "effect"
 
-export class RepoNotFound extends Data.TaggedError("RepoNotFound")<{
-  owner: string
-  repo: string
-}> {}
+export class RepoNotFound extends Schema.TaggedError<RepoNotFound>()(
+  "RepoNotFound",
+  {
+    owner: Schema.String,
+    repo: Schema.String,
+  }
+) {}
 
-export class RateLimited extends Data.TaggedError("RateLimited")<{
-  resetAt: number
-  remaining: number
-}> {}
+export class RateLimited extends Schema.TaggedError<RateLimited>()(
+  "RateLimited",
+  {
+    resetAt: Schema.Number,
+    remaining: Schema.Number,
+  }
+) {}
 
-export class GitHubApiError extends Data.TaggedError("GitHubApiError")<{
-  status: number
-  message: string
-}> {}
+export class GitHubApiError extends Schema.TaggedError<GitHubApiError>()(
+  "GitHubApiError",
+  {
+    status: Schema.Number,
+    message: Schema.String,
+    cause: Schema.Defect, // wraps unknown Octokit error
+  }
+) {}
 
-export class InvalidRepoUrl extends Data.TaggedError("InvalidRepoUrl")<{
-  input: string
-}> {}
+export class InvalidRepoUrl extends Schema.TaggedError<InvalidRepoUrl>()(
+  "InvalidRepoUrl",
+  {
+    input: Schema.String,
+  }
+) {}
 
-// Union type for all GitHub errors
-export type GitHubError = RepoNotFound | RateLimited | GitHubApiError | InvalidRepoUrl
+// Union for exhaustive matching
+export const GitHubError = Schema.Union(RepoNotFound, RateLimited, GitHubApiError, InvalidRepoUrl)
+export type GitHubError = typeof GitHubError.Type
 ```
 
 ## OctokitClient Service (`client.ts`)
 
+Uses the "use" pattern: wraps Octokit behind a typed interface with centralized error handling, automatic tracing spans, and `Config.redacted` for the token (testable, redacted in logs).
+
 ```ts
-import { Context, Effect, Layer } from "effect"
+import { Context, Config, Effect, Layer, Redacted } from "effect"
 import { Octokit } from "octokit"
 
-export class OctokitClient extends Context.Tag("OctokitClient")<
-  OctokitClient,
-  Octokit
->() {}
+export class OctokitError extends Schema.TaggedError<OctokitError>()(
+  "OctokitError",
+  { cause: Schema.Defect }
+) {}
 
-export const OctokitClientLive = Layer.sync(OctokitClient, () =>
-  new Octokit({ auth: process.env.GITHUB_TOKEN })
-)
+export type IOctokitClient = Readonly<{
+  use: <A>(
+    fn: (client: Octokit) => Promise<A>
+  ) => Effect.Effect<A, OctokitError>
+}>
+
+const make = Effect.gen(function* () {
+  const token = yield* Config.redacted("GITHUB_TOKEN")
+
+  const client = new Octokit({ auth: Redacted.value(token) })
+
+  const use = <A>(fn: (client: Octokit) => Promise<A>) =>
+    Effect.tryPromise({
+      try: () => fn(client),
+      catch: (cause) => new OctokitError({ cause }),
+    }).pipe(Effect.withSpan(`octokit.${fn.name ?? "use"}`))
+
+  return { use } satisfies IOctokitClient
+})
+
+export class OctokitClient extends Context.Tag("@gitreel/OctokitClient")<
+  OctokitClient,
+  IOctokitClient
+>() {
+  static readonly Default = Layer.effect(this, make).pipe(
+    Layer.annotateSpans({ module: "OctokitClient" })
+  )
+}
 ```
 
-Fetchers depend on `OctokitClient` via Effect's service pattern — no global singletons, easy to test with mock layer.
+Fetchers call `octokit.use(c => c.rest.repos.get(...))` — all Octokit errors caught as typed `OctokitError`, each call automatically traced. Easy to test with a mock layer.
 
 ## Fetcher Signatures
 
-Each fetcher returns an Effect:
+Each fetcher uses `Effect.fn` for call-site tracing. Fetchers call `OctokitClient.use(...)` and map `OctokitError` to domain errors (e.g. 404 -> `RepoNotFound`, 403+rate-limit headers -> `RateLimited`, rest -> `GitHubApiError`).
 
 ```ts
 // fetchers/repo.ts
-export const fetchRepo = (owner: string, repo: string):
-  Effect<RepoMeta, RepoNotFound | GitHubApiError, OctokitClient>
+export const fetchRepo = Effect.fn("fetchRepo")(
+  function* (owner: string, repo: string) {
+    const octokit = yield* OctokitClient
+    const { data } = yield* octokit.use(
+      (c) => c.rest.repos.get({ owner, repo })
+    ).pipe(
+      Effect.catchTag("OctokitError", (e) => mapOctokitError(e, owner, repo))
+    )
+    return RepoMeta.make({ ... })
+  }
+)
+// Effect<RepoMeta, RepoNotFound | RateLimited | GitHubApiError, OctokitClient>
 
 // fetchers/commits.ts
-export const fetchCommits = (owner: string, repo: string):
-  Effect<TimelineCommit[], RateLimited | GitHubApiError, OctokitClient>
+export const fetchCommits = Effect.fn("fetchCommits")(
+  function* (owner: string, repo: string) { ... }
+)
+// Effect<TimelineCommit[], RateLimited | GitHubApiError, OctokitClient>
 
 // fetchers/trees.ts
-export const fetchTree = (owner: string, repo: string, sha: string):
-  Effect<TreeSnapshot, GitHubApiError, OctokitClient>
+export const fetchTree = Effect.fn("fetchTree")(
+  function* (owner: string, repo: string, sha: string) { ... }
+)
+// Effect<TreeSnapshot, GitHubApiError, OctokitClient>
 
 // fetchers/languages.ts
-export const fetchLanguages = (owner: string, repo: string):
-  Effect<LanguageBreakdown, GitHubApiError, OctokitClient>
+export const fetchLanguages = Effect.fn("fetchLanguages")(
+  function* (owner: string, repo: string) { ... }
+)
+// Effect<LanguageBreakdown, GitHubApiError, OctokitClient>
 
 // fetchers/contributors.ts
-export const fetchContributors = (owner: string, repo: string):
-  Effect<Contributor[], GitHubApiError, OctokitClient>
+export const fetchContributors = Effect.fn("fetchContributors")(
+  function* (owner: string, repo: string) { ... }
+)
+// Effect<Contributor[], GitHubApiError, OctokitClient>
+```
+
+Shared helper to map `OctokitError` -> domain errors based on HTTP status/headers:
+
+```ts
+// errors.ts (or a shared helper)
+const mapOctokitError = (e: OctokitError, owner: string, repo: string) => {
+  const cause = e.cause
+  if (cause instanceof RequestError) {
+    if (cause.status === 404) return new RepoNotFound({ owner, repo })
+    if (cause.status === 403 && cause.response?.headers["x-ratelimit-remaining"] === "0")
+      return new RateLimited({ resetAt: ..., remaining: 0 })
+  }
+  return new GitHubApiError({ status: cause.status ?? 500, message: String(cause), cause })
+}
 ```
 
 ## Orchestrator (`timeline.ts`)
 
+Uses `Effect.fn` for tracing. `Effect.provide(OctokitClient.Default)` happens once at the oRPC boundary, not here — the orchestrator just declares `OctokitClient` as a dependency.
+
 ```ts
-export const fetchRepoTimeline = (input: string) =>
-  Effect.gen(function* () {
+export const fetchRepoTimeline = Effect.fn("fetchRepoTimeline")(
+  function* (input: string) {
     const { owner, repo } = yield* parseRepoUrl(input)
 
     // parallel: independent fetches
@@ -198,7 +276,7 @@ export const fetchRepoTimeline = (input: string) =>
       { concurrency: 5 }
     )
 
-    return {
+    return RepoTimeline.make({
       repo: repoMeta,
       commits: allCommits,
       keyframes,
@@ -206,21 +284,21 @@ export const fetchRepoTimeline = (input: string) =>
       contributors,
       totalCommits: allCommits.length,
       totalStars: repoMeta.stars,
-      fetchedAt: Date.now(),
-    } satisfies RepoTimeline
-  })
+      fetchedAt: new Date(),
+    })
+  }
+)
 ```
 
 ## oRPC Layer (`packages/api/src/router.ts`)
 
-Router lives in `@workspace/api`. GitHub procedures will be added here once `packages/github` is built:
+Router lives in `@workspace/api`. `Effect.provide(OctokitClient.Default)` applied once here at the boundary. Error mapping uses `Effect.catchTags` for exhaustive handling.
 
 ```ts
 import { os, ORPCError } from "@orpc/server"
 import { z } from "zod"
-import { fetchRepoTimeline } from "@workspace/github"
+import { fetchRepoTimeline, OctokitClient } from "@workspace/github"
 import { Effect } from "effect"
-import { OctokitClientLive } from "@workspace/github/client"
 
 const github = {
   getTimeline: os
@@ -232,19 +310,18 @@ const github = {
     })
     .handler(async ({ input, errors }) => {
       const program = fetchRepoTimeline(input.url).pipe(
-        Effect.provide(OctokitClientLive)
+        // map Effect errors → oRPC typed errors exhaustively
+        Effect.catchTags({
+          RepoNotFound: (e) => Effect.fail(errors.REPO_NOT_FOUND({ data: { owner: e.owner, repo: e.repo } })),
+          RateLimited: (e) => Effect.fail(errors.RATE_LIMITED({ data: { resetAt: e.resetAt } })),
+          InvalidRepoUrl: (e) => Effect.fail(errors.INVALID_URL({ data: { input: e.input } })),
+          GitHubApiError: (e) => Effect.die(new ORPCError("INTERNAL_SERVER_ERROR", { message: e.message })),
+        }),
+        // provide layer once at the boundary
+        Effect.provide(OctokitClient.Default)
       )
 
-      const result = await Effect.runPromiseExit(program)
-
-      if (result._tag === "Success") return result.value
-
-      const error = result.cause
-      // map Effect errors → oRPC typed errors
-      // RepoNotFound → errors.REPO_NOT_FOUND(...)
-      // RateLimited → errors.RATE_LIMITED(...)
-      // InvalidRepoUrl → errors.INVALID_URL(...)
-      // GitHubApiError → throw new ORPCError("INTERNAL_SERVER_ERROR")
+      return await Effect.runPromise(program)
     }),
 }
 
@@ -253,64 +330,83 @@ export const router = { health, github }
 
 ## Core Types (`types.ts`)
 
+Use `Schema.Class` for runtime validation + serialization. Branded types for domain primitives (SHA, dates). These are the single source of truth — derive TS types from schema.
+
 ```ts
-type RepoTimeline = {
-  repo: RepoMeta
-  commits: TimelineCommit[]
-  keyframes: TreeSnapshot[]
-  languages: LanguageBreakdown
-  contributors: Contributor[]
-  totalCommits: number
-  totalStars: number
-  fetchedAt: number
-}
+import { Schema } from "effect"
 
-type RepoMeta = {
-  owner: string
-  name: string
-  fullName: string
-  description: string | null
-  stars: number
-  forks: number
-  createdAt: string
-  defaultBranch: string
-}
+// Branded primitives
+export const CommitSha = Schema.String.pipe(Schema.brand("CommitSha"))
+export type CommitSha = typeof CommitSha.Type
 
-type TimelineCommit = {
-  sha: string
-  message: string
-  author: { login: string; avatarUrl: string }
-  date: string
-  treeSha: string
-}
+export const GitHubLogin = Schema.String.pipe(Schema.brand("GitHubLogin"))
+export type GitHubLogin = typeof GitHubLogin.Type
 
-type TreeSnapshot = {
-  commitSha: string
-  date: string
-  files: TreeFile[]
-}
+// Data models
+export class RepoMeta extends Schema.Class<RepoMeta>("RepoMeta")({
+  owner: Schema.String,
+  name: Schema.String,
+  fullName: Schema.String,
+  description: Schema.NullOr(Schema.String),
+  stars: Schema.Number,
+  forks: Schema.Number,
+  createdAt: Schema.String,
+  defaultBranch: Schema.String,
+}) {}
 
-type TreeFile = {
-  path: string
-  size: number
-  language: string | null
-}
+export class CommitAuthor extends Schema.Class<CommitAuthor>("CommitAuthor")({
+  login: GitHubLogin,
+  avatarUrl: Schema.String,
+}) {}
 
-type LanguageBreakdown = Record<string, number>
+export class TimelineCommit extends Schema.Class<TimelineCommit>("TimelineCommit")({
+  sha: CommitSha,
+  message: Schema.String,
+  author: CommitAuthor,
+  date: Schema.String,
+  treeSha: CommitSha,
+}) {}
 
-type Contributor = {
-  login: string
-  avatarUrl: string
-  contributions: number
-}
+export class TreeFile extends Schema.Class<TreeFile>("TreeFile")({
+  path: Schema.String,
+  size: Schema.Number,
+  language: Schema.NullOr(Schema.String),
+}) {}
+
+export class TreeSnapshot extends Schema.Class<TreeSnapshot>("TreeSnapshot")({
+  commitSha: CommitSha,
+  date: Schema.String,
+  files: Schema.Array(TreeFile),
+}) {}
+
+export class Contributor extends Schema.Class<Contributor>("Contributor")({
+  login: GitHubLogin,
+  avatarUrl: Schema.String,
+  contributions: Schema.Number,
+}) {}
+
+export const LanguageBreakdown = Schema.Record({ key: Schema.String, value: Schema.Number })
+export type LanguageBreakdown = typeof LanguageBreakdown.Type
+
+export class RepoTimeline extends Schema.Class<RepoTimeline>("RepoTimeline")({
+  repo: RepoMeta,
+  commits: Schema.Array(TimelineCommit),
+  keyframes: Schema.Array(TreeSnapshot),
+  languages: LanguageBreakdown,
+  contributors: Schema.Array(Contributor),
+  totalCommits: Schema.Number,
+  totalStars: Schema.Number,
+  fetchedAt: Schema.Date,
+}) {}
 ```
 
 ## Fetcher Details
 
 ### URL Parser (`parser.ts`)
 - Input: full URL, `owner/repo`, URL with extra paths (`/tree/main/src`)
-- Output: `Effect<{ owner, repo }, InvalidRepoUrl>`
+- Output: `Effect<{ owner: string, repo: string }, InvalidRepoUrl>` (pure, no `R`)
 - Regex-based, handles `github.com`, `www.github.com`, `.git` suffix
+- Uses `Effect.fn("parseRepoUrl")` for tracing
 
 ### Commit History (`fetchers/commits.ts`)
 - Endpoint: `GET /repos/{owner}/{repo}/commits` (100 per page)
@@ -367,10 +463,10 @@ type Contributor = {
 
 1. ~~oRPC `packages/api` + catch-all route in `apps/web`~~ ✅ DONE
 2. Package scaffolding (`packages/github`, deps, tsconfig)
-3. `types.ts` — all data types
-4. `errors.ts` — Effect tagged errors
+3. `types.ts` — Schema.Class data models + branded primitives
+4. `errors.ts` — Schema.TaggedError types + OctokitError mapping helper
 5. `parser.ts` — URL parsing (pure Effect)
-6. `client.ts` — OctokitClient service + layer
+6. `client.ts` — OctokitClient "use" pattern wrapper + Config.redacted
 7. `fetchers/repo.ts` — simplest fetcher, validates Effect + octokit wiring
 8. `fetchers/commits.ts` — paginated fetching
 9. `sampling.ts` — commit sampling (pure function)
@@ -388,7 +484,7 @@ type Contributor = {
 - **Stargazer timeline**: expensive paginated endpoint. Skip for MVP, use total count.
 - **Caching layer**: Redis/KV keyed by `owner/repo`. Add when deploying.
 - **GitHub App auth**: swap PAT for installation tokens when needed.
-- **Effect Schema**: could replace Zod for oRPC input validation to stay fully in Effect ecosystem. Evaluate after MVP.
+- **Effect Schema for oRPC**: could replace Zod for oRPC input validation to stay fully in Effect ecosystem. Evaluate after MVP. Data types already use Schema.Class so the migration surface is small.
 
 ---
 
