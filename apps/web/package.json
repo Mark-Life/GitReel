@@ -12,12 +12,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@remotion/player": "^4.0.429",
+    "@remotion/web-renderer": "^4.0.429",
     "@workspace/ui": "workspace:*",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
     "next-themes": "^0.4.6",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "remotion": "^4.0.429"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
