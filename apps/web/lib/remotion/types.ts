@@ -96,6 +96,18 @@ export interface OutroProps {
   repoAgeYears: number;
 }
 
+export interface LanguagePieProps {
+  languages: Record<string, number>;
+}
+
+export interface ContributorGridProps {
+  contributors: VideoContributor[];
+}
+
+export interface PulseRingProps {
+  commits: VideoTimelineCommit[];
+}
+
 /** Master composition inputProps */
 export interface GitReelProps {
   keyframes: TreemapKeyframe[];
