@@ -5,7 +5,8 @@
     "paths": {
       "@/*": ["./*"],
       "@workspace/ui/*": ["../../packages/ui/src/*"],
-      "@workspace/api/*": ["../../packages/api/src/*"]
+      "@workspace/api/*": ["../../packages/api/src/*"],
+      "@workspace/github": ["../../packages/github/src/index.ts"]
     },
     "plugins": [
       {
