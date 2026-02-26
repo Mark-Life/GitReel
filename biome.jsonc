@@ -1,0 +1,48 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": ["ultracite/biome/core", "ultracite/biome/next"],
+  "files": {
+    "includes": [
+      "apps/**/*.ts",
+      "apps/**/*.tsx",
+      "packages/**/*.ts",
+      "packages/**/*.tsx",
+      "!node_modules/**/*",
+      "!dist/**/*",
+      "!packages/ui/src/components/**/*",
+      "!packages/ui/src/hooks/**/*",
+      "!packages/ui/src/lib/**/*"
+    ]
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "suspicious": {
+        "noUnknownAtRules": "off",
+        "noConsole": "off"
+      },
+      "style": {
+        "noMagicNumbers": "warn",
+        "useConsistentTypeDefinitions": {
+          "level": "error",
+          "options": {
+            "style": "interface"
+          }
+        }
+      },
+      "correctness": {
+        "noUndeclaredVariables": {
+          "level": "error",
+          "options": {
+            "checkTypes": true
+          }
+        }
+      },
+      "performance": {
+        "noNamespaceImport": "off",
+        "noBarrelFile": "off"
+      }
+    }
+  }
+}
