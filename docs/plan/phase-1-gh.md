@@ -44,6 +44,12 @@ Benefits over try/catch:
 ## Architecture
 
 ```
+packages/api/                     # ✅ DONE — oRPC router + typed client
+  src/
+    router.ts             # oRPC router (health.check placeholder)
+    client.ts             # createClient(baseUrl) → typed RouterClient
+    index.ts              # re-exports
+
 packages/github/
   src/
     index.ts              # public exports
@@ -65,11 +71,7 @@ packages/github/
 apps/web/
   app/
     rpc/[[...rest]]/
-      route.ts            # oRPC catch-all handler
-  lib/
-    rpc/
-      router.ts           # oRPC router (procedures calling packages/github)
-      client.ts           # oRPC client for browser
+      route.ts            # ✅ DONE — thin catch-all (imports from @workspace/api)
 ```
 
 ## Data Flow
@@ -209,7 +211,9 @@ export const fetchRepoTimeline = (input: string) =>
   })
 ```
 
-## oRPC Layer (`apps/web/lib/rpc/router.ts`)
+## oRPC Layer (`packages/api/src/router.ts`)
+
+Router lives in `@workspace/api`. GitHub procedures will be added here once `packages/github` is built:
 
 ```ts
 import { os, ORPCError } from "@orpc/server"
@@ -244,7 +248,7 @@ const github = {
     }),
 }
 
-export const router = { github }
+export const router = { health, github }
 ```
 
 ## Core Types (`types.ts`)
@@ -361,21 +365,22 @@ type Contributor = {
 
 ## Implementation Order
 
-1. Package scaffolding (`packages/github`, deps, tsconfig)
-2. `types.ts` — all data types
-3. `errors.ts` — Effect tagged errors
-4. `parser.ts` — URL parsing (pure Effect)
-5. `client.ts` — OctokitClient service + layer
-6. `fetchers/repo.ts` — simplest fetcher, validates Effect + octokit wiring
-7. `fetchers/commits.ts` — paginated fetching
-8. `sampling.ts` — commit sampling (pure function)
-9. `fetchers/trees.ts` — tree snapshots
-10. `fetchers/languages.ts` — language data
-11. `fetchers/contributors.ts` — contributor data
-12. `timeline.ts` — orchestrator composing all effects
-13. `index.ts` — public exports
-14. oRPC router + handler in `apps/web`
-15. oRPC client in `apps/web`
+1. ~~oRPC `packages/api` + catch-all route in `apps/web`~~ ✅ DONE
+2. Package scaffolding (`packages/github`, deps, tsconfig)
+3. `types.ts` — all data types
+4. `errors.ts` — Effect tagged errors
+5. `parser.ts` — URL parsing (pure Effect)
+6. `client.ts` — OctokitClient service + layer
+7. `fetchers/repo.ts` — simplest fetcher, validates Effect + octokit wiring
+8. `fetchers/commits.ts` — paginated fetching
+9. `sampling.ts` — commit sampling (pure function)
+10. `fetchers/trees.ts` — tree snapshots
+11. `fetchers/languages.ts` — language data
+12. `fetchers/contributors.ts` — contributor data
+13. `timeline.ts` — orchestrator composing all effects
+14. `index.ts` — public exports
+15. Wire github procedures into `@workspace/api` router
+16. oRPC client usage in `apps/web`
 
 ## Future Considerations (not in scope now)
 
@@ -384,3 +389,11 @@ type Contributor = {
 - **Caching layer**: Redis/KV keyed by `owner/repo`. Add when deploying.
 - **GitHub App auth**: swap PAT for installation tokens when needed.
 - **Effect Schema**: could replace Zod for oRPC input validation to stay fully in Effect ecosystem. Evaluate after MVP.
+
+---
+
+**Done:**
+- `packages/api` — oRPC router (`health.check`), typed client (`createClient`), exported as `@workspace/api`
+- `apps/web/app/rpc/[[...rest]]/route.ts` — thin catch-all handler
+- `apps/web` deps cleaned: `@orpc/*` + `zod` moved to `@workspace/api`, web depends on `@workspace/api: workspace:*`
+- Verified: `POST /rpc/health/check` → `{"json":{"status":"ok"}}`
