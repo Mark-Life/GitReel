@@ -1,6 +1,7 @@
 "use client";
 
 import { Player } from "@remotion/player";
+import { getCached, normalizeRepoKey, setCache } from "@workspace/api/cache";
 import { createClient } from "@workspace/api/client";
 import { type FC, type FormEvent, useCallback, useMemo, useState } from "react";
 import { toVideoTimeline } from "../../../lib/remotion/convert";
@@ -73,10 +74,27 @@ export default function VisualsTestPage() {
       setState({ status: "loading" });
 
       try {
+        const cacheKey = normalizeRepoKey(url) ?? url;
+
+        const cached = getCached<{
+          timeline: VideoTimeline;
+          keyframes: TreemapKeyframe[];
+        }>(cacheKey);
+
+        if (cached) {
+          setState({
+            status: "ready",
+            timeline: cached.timeline,
+            keyframes: cached.keyframes,
+          });
+          return;
+        }
+
         const client = createClient(window.location.origin);
         const repo = await client.github.getTimeline({ url });
         const timeline = toVideoTimeline(repo);
         const keyframes = computeAllKeyframes(repo.snapshots);
+        setCache(cacheKey, { timeline, keyframes });
         setState({ status: "ready", timeline, keyframes });
       } catch (err) {
         setState({
