@@ -10,7 +10,6 @@ import {
 import {
   buildFileTree,
   diffFileSets,
-  diffSize,
   type FlatFileEntry,
   flattenTree,
 } from "../../video/file-tree";
@@ -30,7 +29,7 @@ const COMMIT_MSG_MAX_LEN = 50;
 
 /**
  * Build a cumulative frame boundary array weighted by diff size.
- * Bigger diffs get proportionally more frames; empty diffs get MIN_FRAMES_PER_KF.
+ * Keyframes with new files get high weight; modify-only keyframes are fast.
  */
 const buildFrameMap = (keyframes: TreemapKeyframe[], totalFrames: number) => {
   if (keyframes.length <= 1) {
@@ -46,8 +45,12 @@ const buildFrameMap = (keyframes: TreemapKeyframe[], totalFrames: number) => {
       weights.push(1);
       continue;
     }
-    const d = diffSize(prev.rects, curr.rects);
-    weights.push(Math.max(d, 1));
+    const { added, modified } = diffFileSets(prev.rects, curr.rects);
+    if (added.size > 0) {
+      weights.push(added.size + modified.size);
+    } else {
+      weights.push(Math.max(modified.size * 0.15, 1));
+    }
   }
 
   const totalWeight = weights.reduce((a, b) => a + b, 0);
@@ -117,6 +120,7 @@ export function FileTreeTimelapse({
         modified: new Set<string>(),
       };
 
+  const hasNewFiles = diff.added.size > 0;
   const newEntryIndices = new Set<number>();
   const modifiedEntryIndices = new Set<number>();
   for (let i = 0; i < entries.length; i++) {
@@ -124,7 +128,7 @@ export function FileTreeTimelapse({
     if (entry && !entry.isDir) {
       if (diff.added.has(entry.path)) {
         newEntryIndices.add(i);
-      } else if (diff.modified.has(entry.path)) {
+      } else if (!hasNewFiles && diff.modified.has(entry.path)) {
         modifiedEntryIndices.add(i);
       }
     }
@@ -146,7 +150,9 @@ export function FileTreeTimelapse({
   );
 
   // Commit message lookup
-  const commitMsg = commits.find((c) => c.sha === currentKf.commitSha)?.message;
+  const commitMsg = commits?.find(
+    (c) => c.sha === currentKf.commitSha
+  )?.message;
   const truncatedMsg = commitMsg
     ? (commitMsg.split("\n")[0]?.slice(0, COMMIT_MSG_MAX_LEN) ?? "")
     : "";
