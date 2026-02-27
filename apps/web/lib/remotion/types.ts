@@ -155,6 +155,7 @@ export interface GlitchTransitionProps {
 }
 
 export interface FileTreeTimelapseProps {
+  commits: VideoTimelineCommit[];
   keyframes: TreemapKeyframe[];
   totalCommits: number;
 }

@@ -118,6 +118,12 @@ const buildSizeMap = (rects: TreemapRect[]) => {
   return map;
 };
 
+/** Count how many files changed between two rect sets */
+export const diffSize = (prev: TreemapRect[], curr: TreemapRect[]) => {
+  const { added, modified } = diffFileSets(prev, curr);
+  return added.size + modified.size;
+};
+
 /** Compute diff between two keyframe rect sets */
 export const diffFileSets = (
   prevRects: TreemapRect[],

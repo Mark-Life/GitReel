@@ -70,6 +70,7 @@ export function HypeComposition({ timeline, keyframes }: GitReelProps) {
         premountFor={fps}
       >
         <FileTreeTimelapse
+          commits={timeline.commits}
           keyframes={keyframes}
           totalCommits={timeline.totalCommits}
         />

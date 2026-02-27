@@ -10,9 +10,11 @@ import {
 import {
   buildFileTree,
   diffFileSets,
+  diffSize,
   type FlatFileEntry,
   flattenTree,
 } from "../../video/file-tree";
+import type { TreemapKeyframe } from "../../video/types";
 import { DateOverlay } from "../components/date-overlay";
 import type { FileTreeTimelapseProps } from "../types";
 
@@ -22,39 +24,81 @@ const FONT_SIZE = 26;
 const VISIBLE_ROWS = 42;
 const VISIBLE_HEIGHT = VISIBLE_ROWS * ROW_HEIGHT;
 const TOP_PADDING = 60;
+const MIN_FRAMES_PER_KF = 4;
+const GUTTER_WIDTH = 3;
+const COMMIT_MSG_MAX_LEN = 50;
 
-/** Compute which keyframe index and local progress for a frame */
-const getKeyframeAt = (
-  frame: number,
-  keyframeCount: number,
-  totalFrames: number
-) => {
-  if (keyframeCount <= 1) {
-    return { index: 0, t: 0 };
+/**
+ * Build a cumulative frame boundary array weighted by diff size.
+ * Bigger diffs get proportionally more frames; empty diffs get MIN_FRAMES_PER_KF.
+ */
+const buildFrameMap = (keyframes: TreemapKeyframe[], totalFrames: number) => {
+  if (keyframes.length <= 1) {
+    return [0, totalFrames];
   }
-  const segments = keyframeCount - 1;
-  const framesPerSegment = totalFrames / segments;
-  const segment = Math.min(Math.floor(frame / framesPerSegment), segments - 1);
-  const t = Math.max(
-    0,
-    Math.min(1, (frame - segment * framesPerSegment) / framesPerSegment)
-  );
-  return { index: segment, t };
+
+  const segments = keyframes.length - 1;
+  const weights: number[] = [];
+  for (let i = 0; i < segments; i++) {
+    const prev = keyframes[i];
+    const curr = keyframes[i + 1];
+    if (!(prev && curr)) {
+      weights.push(1);
+      continue;
+    }
+    const d = diffSize(prev.rects, curr.rects);
+    weights.push(Math.max(d, 1));
+  }
+
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+  const reservedFrames = MIN_FRAMES_PER_KF * segments;
+  const distributableFrames = Math.max(0, totalFrames - reservedFrames);
+
+  const boundaries = [0];
+  let cursor = 0;
+  for (let i = 0; i < segments; i++) {
+    const w = weights[i] ?? 1;
+    const extra = Math.round((w / totalWeight) * distributableFrames);
+    cursor += MIN_FRAMES_PER_KF + extra;
+    boundaries.push(i === segments - 1 ? totalFrames : cursor);
+  }
+  return boundaries;
+};
+
+/** Look up keyframe index from weighted frame map via binary search */
+const getKeyframeFromMap = (frame: number, boundaries: number[]) => {
+  let lo = 0;
+  let hi = boundaries.length - 2;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi + 1) / 2);
+    if ((boundaries[mid] ?? 0) <= frame) {
+      lo = mid;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  const start = boundaries[lo] ?? 0;
+  const end = boundaries[lo + 1] ?? 1;
+  const localFrame = frame - start;
+  const segmentFrames = end - start;
+  return { index: lo, localFrame, segmentFrames };
 };
 
 /** VS Code-style file tree timelapse — files appear as the repo grows */
 export function FileTreeTimelapse({
+  commits,
   keyframes,
   totalCommits,
 }: FileTreeTimelapseProps) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
 
-  const { index: kfIndex } = getKeyframeAt(
-    frame,
-    keyframes.length,
-    durationInFrames
-  );
+  const frameMap = buildFrameMap(keyframes, durationInFrames);
+  const {
+    index: kfIndex,
+    localFrame,
+    segmentFrames,
+  } = getKeyframeFromMap(frame, frameMap);
 
   const currentKf = keyframes[kfIndex];
   if (!currentKf) {
@@ -94,31 +138,27 @@ export function FileTreeTimelapse({
   const scrollRow = Math.min(targetScrollRow, maxScroll);
   const scrollY = scrollRow * ROW_HEIGHT;
 
-  // Segment local frame for staggered animations
-  const segments = Math.max(keyframes.length - 1, 1);
-  const framesPerSegment = durationInFrames / segments;
-  const localFrame = frame - kfIndex * framesPerSegment;
-
+  // Animated counters
   const commitCount = Math.floor(
     interpolate(frame, [0, durationInFrames], [0, totalCommits], {
       extrapolateRight: "clamp",
     })
   );
 
+  // Commit message lookup
+  const commitMsg = commits.find((c) => c.sha === currentKf.commitSha)?.message;
+  const truncatedMsg = commitMsg
+    ? (commitMsg.split("\n")[0]?.slice(0, COMMIT_MSG_MAX_LEN) ?? "")
+    : "";
+  const msgOpacity = interpolate(
+    localFrame,
+    [0, 4, segmentFrames * 0.7, segmentFrames],
+    [0, 1, 1, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+  );
+
   return (
     <AbsoluteFill style={{ backgroundColor: "#0d1117" }}>
-      {/* Left gutter line */}
-      <div
-        style={{
-          position: "absolute",
-          top: TOP_PADDING,
-          left: 38,
-          width: 2,
-          height: VISIBLE_HEIGHT,
-          backgroundColor: "rgba(255,255,255,0.06)",
-        }}
-      />
-
       {/* File tree area */}
       <div
         style={{
@@ -144,6 +184,7 @@ export function FileTreeTimelapse({
               isNew={newEntryIndices.has(i)}
               key={entry.path}
               localFrame={localFrame}
+              segmentFrames={segmentFrames}
               staggerIndex={[...newEntryIndices].indexOf(i)}
             />
           ))}
@@ -161,6 +202,28 @@ export function FileTreeTimelapse({
       >
         <DateOverlay date={currentKf.date} />
       </div>
+
+      {/* Commit message flash */}
+      {truncatedMsg && (
+        <div
+          style={{
+            position: "absolute",
+            top: TOP_PADDING + VISIBLE_HEIGHT + 60,
+            left: 40,
+            right: 40,
+            opacity: msgOpacity,
+            fontFamily: "monospace",
+            fontSize: 18,
+            color: "rgba(255,255,255,0.55)",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            textShadow: "0 1px 4px rgba(0,0,0,0.6)",
+          }}
+        >
+          {truncatedMsg}
+        </div>
+      )}
 
       {/* Bottom stats */}
       <div
@@ -204,6 +267,7 @@ function FileRow({
   isNew,
   isModified,
   localFrame,
+  segmentFrames,
   staggerIndex,
   fps,
 }: {
@@ -212,6 +276,7 @@ function FileRow({
   isModified: boolean;
   isNew: boolean;
   localFrame: number;
+  segmentFrames: number;
   staggerIndex: number;
 }) {
   const delay = isNew ? Math.max(0, staggerIndex) * 2 : 0;
@@ -250,18 +315,49 @@ function FileRow({
       ? `rgba(227, 179, 23, ${yellowHighlight})`
       : `rgba(63, 185, 80, ${greenHighlight})`;
 
+  // Heatmap gutter color
+  let gutterColor = "rgba(255,255,255,0.06)";
+  if (isNew) {
+    const a = interpolate(
+      localFrame - delay,
+      [0, 5, segmentFrames],
+      [0, 0.9, 0.15],
+      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+    );
+    gutterColor = `rgba(63, 185, 80, ${a})`;
+  } else if (isModified) {
+    const a = interpolate(localFrame, [0, 5, segmentFrames], [0, 0.9, 0.15], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+    gutterColor = `rgba(227, 179, 23, ${a})`;
+  }
+
   return (
     <div
       style={{
         height: ROW_HEIGHT,
         display: "flex",
         alignItems: "center",
-        paddingLeft: entry.depth * INDENT_PX + 12,
+        paddingLeft: entry.depth * INDENT_PX + 16,
         opacity,
         transform: `translateX(${translateX}px)`,
         position: "relative",
       }}
     >
+      {/* Heatmap gutter bar */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 1,
+          bottom: 1,
+          width: GUTTER_WIDTH,
+          backgroundColor: gutterColor,
+          borderRadius: 1,
+        }}
+      />
+
       {/* Highlight for new (green) or modified (yellow) files */}
       {highlightOpacity > 0 && (
         <div
