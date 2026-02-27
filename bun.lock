@@ -4,6 +4,10 @@
   "workspaces": {
     "": {
       "name": "netxjs-monorepo",
+      "dependencies": {
+        "@orpc/client": "^1.13.5",
+        "@orpc/server": "^1.13.5",
+      },
       "devDependencies": {
         "@biomejs/biome": "2.4.0",
         "@effect/language-service": "^0.76.0",

@@ -7,6 +7,7 @@ import {
   computeVideoConfig,
   GitReelComposition,
 } from "../../../lib/remotion/composition";
+import { computeHypeConfig } from "../../../lib/remotion/hype-config";
 import type { GitReelProps, VideoTimeline } from "../../../lib/remotion/types";
 import type { TreemapKeyframe, TreemapRect } from "../../../lib/video/types";
 
@@ -109,9 +110,12 @@ export default function CompositionTestPage() {
 
   const { config } = computeVideoConfig(MOCK_TIMELINE, keyframes);
 
+  const { timings } = computeHypeConfig(MOCK_TIMELINE, keyframes);
+
   const inputProps: GitReelProps = {
     timeline: MOCK_TIMELINE,
     keyframes,
+    timings,
   };
 
   return (

@@ -16,6 +16,7 @@
   },
   "exports": {
     "./router": "./src/router.ts",
-    "./client": "./src/client.ts"
+    "./client": "./src/client.ts",
+    "./cache": "./src/cache.ts"
   }
 }
