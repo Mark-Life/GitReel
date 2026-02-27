@@ -2,7 +2,14 @@
 
 import { Player } from "@remotion/player";
 import { createClient } from "@workspace/api/client";
-import { type FC, type FormEvent, useCallback, useMemo, useState } from "react";
+import {
+  type FC,
+  type FormEvent,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toVideoTimeline } from "../lib/remotion/convert";
 import { HypeComposition } from "../lib/remotion/hype-composition";
 import { computeHypeConfig } from "../lib/remotion/hype-config";
@@ -61,6 +68,12 @@ type State =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "ready"; timeline: VideoTimeline; keyframes: TreemapKeyframe[] }
+  | { status: "error"; message: string };
+
+type RenderState =
+  | { status: "idle" }
+  | { status: "rendering"; renderedFrames: number; totalFrames: number }
+  | { status: "done"; url: string; timeMs: number }
   | { status: "error"; message: string };
 
 export default function VisualsTestPage() {
@@ -177,6 +190,77 @@ function ReadyView({
     [timeline, keyframes]
   );
 
+  const [renderState, setRenderState] = useState<RenderState>({
+    status: "idle",
+  });
+  const abortRef = useRef<AbortController | null>(null);
+
+  const handleRender = useCallback(async () => {
+    setRenderState({
+      status: "rendering",
+      renderedFrames: 0,
+      totalFrames: config.durationInFrames,
+    });
+    abortRef.current = new AbortController();
+    const start = performance.now();
+
+    try {
+      const { renderMediaOnWeb } = await import("@remotion/web-renderer");
+
+      const { getBlob } = await renderMediaOnWeb({
+        composition: {
+          component: HypeComposition as FC<Record<string, unknown>>,
+          durationInFrames: config.durationInFrames,
+          fps: config.fps,
+          width: COMP_WIDTH,
+          height: COMP_HEIGHT,
+          id: "hype",
+        },
+        inputProps: hypeProps as unknown as Record<string, unknown>,
+        licenseKey: "free-license",
+        signal: abortRef.current.signal,
+        onProgress: ({ renderedFrames }) => {
+          setRenderState({
+            status: "rendering",
+            renderedFrames,
+            totalFrames: config.durationInFrames,
+          });
+        },
+      });
+
+      const blob = await getBlob();
+      const url = URL.createObjectURL(blob);
+      setRenderState({
+        status: "done",
+        url,
+        timeMs: Math.round(performance.now() - start),
+      });
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        setRenderState({ status: "idle" });
+        return;
+      }
+      setRenderState({
+        status: "error",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }, [config, hypeProps]);
+
+  const handleCancel = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
+
+  const handleDownload = useCallback(() => {
+    if (renderState.status !== "done") {
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = renderState.url;
+    a.download = `gitreel-${timeline.meta.name}.mp4`;
+    a.click();
+  }, [renderState, timeline.meta.name]);
+
   const titleProps: HypeTitleProps = { meta: timeline.meta };
   const numberProps: NumberSlamProps = {
     totalCommits: timeline.totalCommits,
@@ -204,23 +288,165 @@ function ReadyView({
     <div>
       {/* Full Hype Composition */}
       <h2 style={{ fontSize: 16, marginBottom: 12 }}>Hype Composition</h2>
-      <Player
-        acknowledgeRemotionLicense
-        component={HypeCompositionComponent}
-        compositionHeight={COMP_HEIGHT}
-        compositionWidth={COMP_WIDTH}
-        controls
-        durationInFrames={config.durationInFrames}
-        fps={config.fps}
-        inputProps={hypeProps as unknown as Record<string, unknown>}
-        loop
-        style={{
-          width: 270,
-          height: 480,
-          borderRadius: 12,
-          marginBottom: 40,
-        }}
-      />
+      <div
+        style={{ display: "flex", gap: 40, flexWrap: "wrap", marginBottom: 40 }}
+      >
+        <Player
+          acknowledgeRemotionLicense
+          component={HypeCompositionComponent}
+          compositionHeight={COMP_HEIGHT}
+          compositionWidth={COMP_WIDTH}
+          controls
+          durationInFrames={config.durationInFrames}
+          fps={config.fps}
+          inputProps={hypeProps as unknown as Record<string, unknown>}
+          loop
+          style={{
+            width: 270,
+            height: 480,
+            borderRadius: 12,
+          }}
+        />
+
+        {/* Export controls */}
+        <div style={{ minWidth: 280 }}>
+          <h3 style={{ fontSize: 14, marginBottom: 12, color: "#ccc" }}>
+            Export
+          </h3>
+
+          <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+            <button
+              disabled={renderState.status === "rendering"}
+              onClick={handleRender}
+              style={{
+                padding: "10px 24px",
+                backgroundColor:
+                  renderState.status === "rendering" ? "#333" : "#3178c6",
+                color: "white",
+                border: "none",
+                borderRadius: 8,
+                cursor:
+                  renderState.status === "rendering"
+                    ? "not-allowed"
+                    : "pointer",
+                fontSize: 14,
+                fontFamily: "monospace",
+              }}
+              type="button"
+            >
+              {renderState.status === "rendering"
+                ? "Rendering..."
+                : "Export MP4"}
+            </button>
+
+            {renderState.status === "rendering" && (
+              <button
+                onClick={handleCancel}
+                style={{
+                  padding: "10px 24px",
+                  backgroundColor: "#dc2626",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontSize: 14,
+                  fontFamily: "monospace",
+                }}
+                type="button"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+
+          {renderState.status === "rendering" && (
+            <div style={{ fontFamily: "monospace", fontSize: 13 }}>
+              <p style={{ color: "#888", marginBottom: 8 }}>
+                {renderState.renderedFrames} / {renderState.totalFrames} frames
+                (
+                {Math.round(
+                  (renderState.renderedFrames / renderState.totalFrames) * 100
+                )}
+                %)
+              </p>
+              <div
+                style={{
+                  width: "100%",
+                  height: 6,
+                  backgroundColor: "#222",
+                  borderRadius: 3,
+                }}
+              >
+                <div
+                  style={{
+                    width: `${(renderState.renderedFrames / renderState.totalFrames) * 100}%`,
+                    height: "100%",
+                    backgroundColor: "#3178c6",
+                    borderRadius: 3,
+                    transition: "width 0.2s",
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {renderState.status === "done" && (
+            <div>
+              <p
+                style={{
+                  color: "#22c55e",
+                  marginBottom: 12,
+                  fontFamily: "monospace",
+                  fontSize: 13,
+                }}
+              >
+                Done in {(renderState.timeMs / 1000).toFixed(1)}s
+              </p>
+              {/* biome-ignore lint/a11y/useMediaCaption: export preview */}
+              <video
+                controls
+                src={renderState.url}
+                style={{
+                  width: 270,
+                  height: 480,
+                  borderRadius: 12,
+                  backgroundColor: "#111",
+                }}
+              />
+              <div style={{ marginTop: 12 }}>
+                <button
+                  onClick={handleDownload}
+                  style={{
+                    padding: "10px 24px",
+                    backgroundColor: "#22c55e",
+                    color: "white",
+                    border: "none",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    fontSize: 14,
+                    fontFamily: "monospace",
+                  }}
+                  type="button"
+                >
+                  Download MP4
+                </button>
+              </div>
+            </div>
+          )}
+
+          {renderState.status === "error" && (
+            <p
+              style={{
+                color: "#ef4444",
+                fontFamily: "monospace",
+                fontSize: 13,
+              }}
+            >
+              Error: {renderState.message}
+            </p>
+          )}
+        </div>
+      </div>
 
       {/* Individual scene previews */}
       <h2 style={{ fontSize: 16, marginBottom: 12 }}>Individual Scenes</h2>

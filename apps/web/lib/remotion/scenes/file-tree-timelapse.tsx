@@ -90,11 +90,14 @@ const getKeyframeFromMap = (frame: number, boundaries: number[]) => {
 /** VS Code-style file tree timelapse — files appear as the repo grows */
 export function FileTreeTimelapse({
   commits,
-  keyframes,
+  keyframes: rawKeyframes,
   totalCommits,
 }: FileTreeTimelapseProps) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
+
+  // API returns newest-first; reverse to show chronological growth (oldest → newest)
+  const keyframes = [...rawKeyframes].reverse();
 
   const frameMap = buildFrameMap(keyframes, durationInFrames);
   const {
@@ -156,9 +159,11 @@ export function FileTreeTimelapse({
   const truncatedMsg = commitMsg
     ? (commitMsg.split("\n")[0]?.slice(0, COMMIT_MSG_MAX_LEN) ?? "")
     : "";
+  const fadeIn = Math.min(4, segmentFrames * 0.2);
+  const fadeOut = Math.max(fadeIn + 0.01, segmentFrames * 0.7);
   const msgOpacity = interpolate(
     localFrame,
-    [0, 4, segmentFrames * 0.7, segmentFrames],
+    [0, fadeIn, fadeOut, segmentFrames],
     [0, 1, 1, 0],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
   );
@@ -322,20 +327,24 @@ function FileRow({
       : `rgba(63, 185, 80, ${greenHighlight})`;
 
   // Heatmap gutter color
+  const gutterPeak = Math.min(5, segmentFrames * 0.3);
+  const gutterEnd = Math.max(gutterPeak + 0.01, segmentFrames);
   let gutterColor = "rgba(255,255,255,0.06)";
   if (isNew) {
     const a = interpolate(
       localFrame - delay,
-      [0, 5, segmentFrames],
+      [0, gutterPeak, gutterEnd],
       [0, 0.9, 0.15],
       { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
     );
     gutterColor = `rgba(63, 185, 80, ${a})`;
   } else if (isModified) {
-    const a = interpolate(localFrame, [0, 5, segmentFrames], [0, 0.9, 0.15], {
-      extrapolateLeft: "clamp",
-      extrapolateRight: "clamp",
-    });
+    const a = interpolate(
+      localFrame,
+      [0, gutterPeak, gutterEnd],
+      [0, 0.9, 0.15],
+      { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+    );
     gutterColor = `rgba(227, 179, 23, ${a})`;
   }
 
