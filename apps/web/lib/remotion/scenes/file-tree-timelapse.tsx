@@ -18,10 +18,10 @@ import type { FileTreeTimelapseProps } from "../types";
 
 const ROW_HEIGHT = 38;
 const INDENT_PX = 28;
-const FONT_SIZE = 22;
-const VISIBLE_ROWS = 36;
+const FONT_SIZE = 26;
+const VISIBLE_ROWS = 42;
 const VISIBLE_HEIGHT = VISIBLE_ROWS * ROW_HEIGHT;
-const TOP_PADDING = 80;
+const TOP_PADDING = 60;
 
 /** Compute which keyframe index and local progress for a frame */
 const getKeyframeAt = (
@@ -66,20 +66,29 @@ export function FileTreeTimelapse({
   const tree = buildFileTree(currentKf.rects);
   const entries = flattenTree(tree, 5);
 
-  const newPaths = prevKf
-    ? diffFileSets(prevKf.rects, currentKf.rects).added
-    : new Set(currentKf.rects.map((r) => r.id));
+  const diff = prevKf
+    ? diffFileSets(prevKf.rects, currentKf.rects)
+    : {
+        added: new Set(currentKf.rects.map((r) => r.id)),
+        modified: new Set<string>(),
+      };
 
   const newEntryIndices = new Set<number>();
+  const modifiedEntryIndices = new Set<number>();
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
-    if (entry && !entry.isDir && newPaths.has(entry.path)) {
-      newEntryIndices.add(i);
+    if (entry && !entry.isDir) {
+      if (diff.added.has(entry.path)) {
+        newEntryIndices.add(i);
+      } else if (diff.modified.has(entry.path)) {
+        modifiedEntryIndices.add(i);
+      }
     }
   }
 
-  // Auto-scroll to show new files
-  const firstNewIndex = [...newEntryIndices][0] ?? 0;
+  // Auto-scroll to show new or modified files
+  const firstNewIndex =
+    [...newEntryIndices][0] ?? [...modifiedEntryIndices][0] ?? 0;
   const targetScrollRow = Math.max(0, firstNewIndex - 4);
   const maxScroll = Math.max(0, entries.length - VISIBLE_ROWS);
   const scrollRow = Math.min(targetScrollRow, maxScroll);
@@ -131,6 +140,7 @@ export function FileTreeTimelapse({
             <FileRow
               entry={entry}
               fps={fps}
+              isModified={modifiedEntryIndices.has(i)}
               isNew={newEntryIndices.has(i)}
               key={entry.path}
               localFrame={localFrame}
@@ -192,12 +202,14 @@ export function FileTreeTimelapse({
 function FileRow({
   entry,
   isNew,
+  isModified,
   localFrame,
   staggerIndex,
   fps,
 }: {
   entry: FlatFileEntry;
   fps: number;
+  isModified: boolean;
   isNew: boolean;
   localFrame: number;
   staggerIndex: number;
@@ -218,12 +230,25 @@ function FileRow({
   const translateX = interpolate(slideIn, [0, 1], [30, 0]);
   const opacity = slideIn;
 
-  const highlightOpacity = isNew
+  const greenHighlight = isNew
     ? interpolate(localFrame - delay, [0, 5, 15], [0, 0.2, 0], {
         extrapolateLeft: "clamp",
         extrapolateRight: "clamp",
       })
     : 0;
+
+  const yellowHighlight = isModified
+    ? interpolate(localFrame, [0, 5, 20], [0, 0.25, 0], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      })
+    : 0;
+
+  const highlightOpacity = greenHighlight + yellowHighlight;
+  const highlightColor =
+    yellowHighlight > 0
+      ? `rgba(227, 179, 23, ${yellowHighlight})`
+      : `rgba(63, 185, 80, ${greenHighlight})`;
 
   return (
     <div
@@ -237,13 +262,13 @@ function FileRow({
         position: "relative",
       }}
     >
-      {/* Green highlight for new files */}
+      {/* Highlight for new (green) or modified (yellow) files */}
       {highlightOpacity > 0 && (
         <div
           style={{
             position: "absolute",
             inset: 0,
-            backgroundColor: `rgba(63, 185, 80, ${highlightOpacity})`,
+            backgroundColor: highlightColor,
             borderRadius: 4,
           }}
         />

@@ -14,12 +14,16 @@ export function WrappedCard({ timeline }: WrappedCardProps) {
   const { fps } = useVideoConfig();
 
   const langCount = Object.keys(timeline.languages).length;
+  const ageText =
+    timeline.repoAgeYears < 1
+      ? `${Math.max(1, Math.round(timeline.repoAgeYears * 12))} months old`
+      : `${timeline.repoAgeYears.toFixed(1)} years old`;
   const lines = [
     `${timeline.totalCommits.toLocaleString()} commits`,
     `${timeline.contributors.length} contributors`,
     `${langCount} languages`,
     `${timeline.meta.stars.toLocaleString()} stars`,
-    `${timeline.repoAgeYears.toFixed(1)} years old`,
+    ageText,
   ];
 
   return (

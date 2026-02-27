@@ -167,6 +167,7 @@ export interface DiffStatsProps {
 export interface HypeSceneTimings {
   boss: SceneTiming;
   diffStats: SceneTiming;
+  grid: SceneTiming;
   numbers: SceneTiming;
   outro: SceneTiming;
   timelapse: SceneTiming;

@@ -13,12 +13,9 @@ const MILLIS_PER_YEAR =
   SECONDS_PER_MINUTE *
   MILLIS_PER_SECOND;
 
-/** Compute repo age in whole years from createdAt ISO string to now */
+/** Compute repo age in fractional years from createdAt ISO string to now */
 const computeRepoAgeYears = (createdAt: string) =>
-  Math.max(
-    1,
-    Math.floor((Date.now() - new Date(createdAt).getTime()) / MILLIS_PER_YEAR)
-  );
+  (Date.now() - new Date(createdAt).getTime()) / MILLIS_PER_YEAR;
 
 /** Map oRPC RepoTimeline response → serializable VideoTimeline for Remotion */
 export const toVideoTimeline = (repo: RepoTimeline): VideoTimeline => ({

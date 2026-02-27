@@ -4,6 +4,7 @@ import { AbsoluteFill, Sequence } from "remotion";
 import { GlitchTransition } from "./effects/glitch-transition";
 import { computeHypeConfig, GLITCH_FRAMES } from "./hype-config";
 import { BossEntry } from "./scenes/boss-entry";
+import { ContributorGrid } from "./scenes/contributor-grid";
 import { DiffStats } from "./scenes/diff-stats";
 import { FileTreeTimelapse } from "./scenes/file-tree-timelapse";
 import { HypeOutro } from "./scenes/hype-outro";
@@ -24,6 +25,7 @@ export function HypeComposition({ timeline, keyframes }: GitReelProps) {
     timings.diffStats,
     timings.timelapse,
     timings.boss,
+    timings.grid,
     timings.wrapped,
     timings.outro,
   ];
@@ -73,13 +75,22 @@ export function HypeComposition({ timeline, keyframes }: GitReelProps) {
         />
       </Sequence>
 
-      {/* Boss entry */}
+      {/* Boss entry — top 3 */}
       <Sequence
         durationInFrames={timings.boss.durationInFrames}
         from={timings.boss.from}
         premountFor={fps}
       >
         <BossEntry contributors={timeline.contributors} />
+      </Sequence>
+
+      {/* Contributor grid — everyone */}
+      <Sequence
+        durationInFrames={timings.grid.durationInFrames}
+        from={timings.grid.from}
+        premountFor={fps}
+      >
+        <ContributorGrid contributors={timeline.contributors} />
       </Sequence>
 
       {/* Wrapped card */}

@@ -109,6 +109,15 @@ export const flattenTree = (
 export const getFilePaths = (rects: TreemapRect[]) =>
   new Set(rects.map((r) => r.id));
 
+/** Build a size lookup from rects (id → w*h) */
+const buildSizeMap = (rects: TreemapRect[]) => {
+  const map = new Map<string, number>();
+  for (const r of rects) {
+    map.set(r.id, r.w * r.h);
+  }
+  return map;
+};
+
 /** Compute diff between two keyframe rect sets */
 export const diffFileSets = (
   prevRects: TreemapRect[],
@@ -116,12 +125,17 @@ export const diffFileSets = (
 ) => {
   const prev = getFilePaths(prevRects);
   const curr = getFilePaths(currRects);
+  const prevSizes = buildSizeMap(prevRects);
+  const currSizes = buildSizeMap(currRects);
   const added = new Set<string>();
   const removed = new Set<string>();
+  const modified = new Set<string>();
 
   for (const p of curr) {
     if (!prev.has(p)) {
       added.add(p);
+    } else if (prevSizes.get(p) !== currSizes.get(p)) {
+      modified.add(p);
     }
   }
   for (const p of prev) {
@@ -130,5 +144,5 @@ export const diffFileSets = (
     }
   }
 
-  return { added, removed };
+  return { added, removed, modified };
 };

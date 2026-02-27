@@ -33,8 +33,16 @@ export function HypeTitle({ meta }: HypeTitleProps) {
     extrapolateRight: "clamp",
   });
 
+  const nameLen = meta.fullName.length;
+  let fontSize = 72;
+  if (nameLen > 20) {
+    fontSize = 56;
+  } else if (nameLen > 14) {
+    fontSize = 64;
+  }
+
   const textStyle = {
-    fontSize: 72,
+    fontSize,
     fontFamily: "monospace",
     fontWeight: "bold" as const,
     textAlign: "center" as const,

@@ -12,16 +12,17 @@ const HEIGHT = 1920;
 
 export const GLITCH_FRAMES = 5;
 
-const TITLE_SECONDS = 2;
-const NUMBERS_SECONDS = 3;
-const DIFF_STATS_SECONDS = 4;
-const BOSS_SECONDS = 3;
-const WRAPPED_SECONDS = 5;
-const OUTRO_SECONDS = 3;
+const TITLE_SECONDS = 3;
+const NUMBERS_SECONDS = 5;
+const DIFF_STATS_SECONDS = 6;
+const BOSS_SECONDS = 4;
+const GRID_SECONDS = 4;
+const WRAPPED_SECONDS = 7;
+const OUTRO_SECONDS = 4;
 
-const MIN_TIMELAPSE_SECONDS = 15;
-const MAX_TIMELAPSE_SECONDS = 45;
-const SECONDS_PER_KEYFRAME = 0.5;
+const MIN_TIMELAPSE_SECONDS = 20;
+const MAX_TIMELAPSE_SECONDS = 60;
+const SECONDS_PER_KEYFRAME = 0.75;
 
 const TREEMAP_WIDTH = 1080;
 const TREEMAP_HEIGHT = 1150;
@@ -65,6 +66,9 @@ export const computeHypeConfig = (
   const boss = timing(cursor, BOSS_SECONDS);
   cursor += boss.durationInFrames;
 
+  const grid = timing(cursor, GRID_SECONDS);
+  cursor += grid.durationInFrames;
+
   const wrapped = timing(cursor, WRAPPED_SECONDS);
   cursor += wrapped.durationInFrames;
 
@@ -77,6 +81,7 @@ export const computeHypeConfig = (
     diffStats,
     timelapse,
     boss,
+    grid,
     wrapped,
     outro,
   };
