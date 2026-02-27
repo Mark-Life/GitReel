@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   AbsoluteFill,
   interpolate,
@@ -87,39 +88,25 @@ const getKeyframeFromMap = (frame: number, boundaries: number[]) => {
   return { index: lo, localFrame, segmentFrames };
 };
 
-/** VS Code-style file tree timelapse — files appear as the repo grows */
-export function FileTreeTimelapse({
-  commits,
-  keyframes: rawKeyframes,
-  totalCommits,
-}: FileTreeTimelapseProps) {
-  const frame = useCurrentFrame();
-  const { fps, durationInFrames } = useVideoConfig();
-
-  // API returns newest-first; reverse to show chronological growth (oldest → newest)
-  const keyframes = [...rawKeyframes].reverse();
-
-  const frameMap = buildFrameMap(keyframes, durationInFrames);
-  const {
-    index: kfIndex,
-    localFrame,
-    segmentFrames,
-  } = getKeyframeFromMap(frame, frameMap);
-
-  const currentKf = keyframes[kfIndex];
-  if (!currentKf) {
-    return <AbsoluteFill style={{ backgroundColor: "#0d1117" }} />;
+/** Compute per-segment data: tree, diff indices, scroll position */
+const computeSegment = (
+  keyframes: TreemapKeyframe[],
+  kfIndex: number,
+  commitMap: Map<string, string>
+) => {
+  const kf = keyframes[kfIndex];
+  if (!kf) {
+    return null;
   }
-
   const prevKf = kfIndex > 0 ? keyframes[kfIndex - 1] : null;
 
-  const tree = buildFileTree(currentKf.rects);
+  const tree = buildFileTree(kf.rects);
   const entries = flattenTree(tree, 5);
 
   const diff = prevKf
-    ? diffFileSets(prevKf.rects, currentKf.rects)
+    ? diffFileSets(prevKf.rects, kf.rects)
     : {
-        added: new Set(currentKf.rects.map((r) => r.id)),
+        added: new Set(kf.rects.map((r) => r.id)),
         modified: new Set<string>(),
       };
 
@@ -137,28 +124,90 @@ export function FileTreeTimelapse({
     }
   }
 
-  // Auto-scroll to show new or modified files
-  const firstNewIndex =
-    [...newEntryIndices][0] ?? [...modifiedEntryIndices][0] ?? 0;
+  const newIndicesArray = [...newEntryIndices];
+  const firstNewIndex = newIndicesArray[0] ?? [...modifiedEntryIndices][0] ?? 0;
   const targetScrollRow = Math.max(0, firstNewIndex - 4);
   const maxScroll = Math.max(0, entries.length - VISIBLE_ROWS);
   const scrollRow = Math.min(targetScrollRow, maxScroll);
   const scrollY = scrollRow * ROW_HEIGHT;
 
-  // Animated counters
+  const fileCount = entries.filter((e) => !e.isDir).length;
+
+  const commitMsg = commitMap.get(kf.commitSha);
+  const truncatedMsg = commitMsg
+    ? (commitMsg.split("\n")[0]?.slice(0, COMMIT_MSG_MAX_LEN) ?? "")
+    : "";
+
+  return {
+    entries,
+    newEntryIndices,
+    newIndicesArray,
+    modifiedEntryIndices,
+    scrollY,
+    fileCount,
+    truncatedMsg,
+    date: kf.date,
+  };
+};
+
+/** VS Code-style file tree timelapse — files appear as the repo grows */
+export function FileTreeTimelapse({
+  commits,
+  keyframes: rawKeyframes,
+  totalCommits,
+}: FileTreeTimelapseProps) {
+  const frame = useCurrentFrame();
+  const { fps, durationInFrames } = useVideoConfig();
+
+  const keyframes = useMemo(() => [...rawKeyframes].reverse(), [rawKeyframes]);
+
+  const frameMap = useMemo(
+    () => buildFrameMap(keyframes, durationInFrames),
+    [keyframes, durationInFrames]
+  );
+
+  const commitMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (commits) {
+      for (const c of commits) {
+        map.set(c.sha, c.message);
+      }
+    }
+    return map;
+  }, [commits]);
+
+  const {
+    index: kfIndex,
+    localFrame,
+    segmentFrames,
+  } = getKeyframeFromMap(frame, frameMap);
+
+  const segmentData = useMemo(
+    () => computeSegment(keyframes, kfIndex, commitMap),
+    [kfIndex, keyframes, commitMap]
+  );
+
+  if (!segmentData) {
+    return <AbsoluteFill style={{ backgroundColor: "#0d1117" }} />;
+  }
+
+  const {
+    entries,
+    newEntryIndices,
+    newIndicesArray,
+    modifiedEntryIndices,
+    scrollY,
+    fileCount,
+    truncatedMsg,
+    date,
+  } = segmentData;
+
   const commitCount = Math.floor(
     interpolate(frame, [0, durationInFrames], [0, totalCommits], {
       extrapolateRight: "clamp",
     })
   );
 
-  // Commit message lookup
-  const commitMsg = commits?.find(
-    (c) => c.sha === currentKf.commitSha
-  )?.message;
-  const truncatedMsg = commitMsg
-    ? (commitMsg.split("\n")[0]?.slice(0, COMMIT_MSG_MAX_LEN) ?? "")
-    : "";
   const fadeIn = Math.min(4, segmentFrames * 0.2);
   const fadeOut = Math.max(fadeIn + 0.01, segmentFrames * 0.7);
   const msgOpacity = interpolate(
@@ -196,7 +245,7 @@ export function FileTreeTimelapse({
               key={entry.path}
               localFrame={localFrame}
               segmentFrames={segmentFrames}
-              staggerIndex={[...newEntryIndices].indexOf(i)}
+              staggerIndex={newIndicesArray.indexOf(i)}
             />
           ))}
         </div>
@@ -211,7 +260,7 @@ export function FileTreeTimelapse({
           width: "100%",
         }}
       >
-        <DateOverlay date={currentKf.date} />
+        <DateOverlay date={date} />
       </div>
 
       {/* Commit message flash */}
@@ -266,7 +315,7 @@ export function FileTreeTimelapse({
             fontSize: 20,
           }}
         >
-          {entries.filter((e) => !e.isDir).length} files
+          {fileCount} files
         </span>
       </div>
     </AbsoluteFill>

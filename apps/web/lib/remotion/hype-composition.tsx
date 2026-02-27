@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { AbsoluteFill, Sequence } from "remotion";
 import { GlitchTransition } from "./effects/glitch-transition";
 import { computeHypeConfig, GLITCH_FRAMES } from "./hype-config";
@@ -14,8 +15,15 @@ import { WrappedCard } from "./scenes/wrapped-card";
 import type { GitReelProps } from "./types";
 
 /** Hype-style GitReel composition — TikTok energy sequence */
-export function HypeComposition({ timeline, keyframes }: GitReelProps) {
-  const { timings } = computeHypeConfig(timeline, keyframes);
+export function HypeComposition({
+  timeline,
+  keyframes,
+  timings: precomputedTimings,
+}: GitReelProps) {
+  const timings = useMemo(
+    () => precomputedTimings ?? computeHypeConfig(timeline, keyframes).timings,
+    [precomputedTimings, timeline, keyframes]
+  );
 
   const fps = 30;
 

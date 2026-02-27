@@ -180,14 +180,14 @@ function ReadyView({
   keyframes: TreemapKeyframe[];
   timeline: VideoTimeline;
 }) {
-  const { config } = useMemo(
+  const { config, timings } = useMemo(
     () => computeHypeConfig(timeline, keyframes),
     [timeline, keyframes]
   );
 
   const hypeProps: GitReelProps = useMemo(
-    () => ({ timeline, keyframes }),
-    [timeline, keyframes]
+    () => ({ timeline, keyframes, timings }),
+    [timeline, keyframes, timings]
   );
 
   const [renderState, setRenderState] = useState<RenderState>({
@@ -209,7 +209,7 @@ function ReadyView({
 
       const { getBlob } = await renderMediaOnWeb({
         composition: {
-          component: HypeComposition as FC<Record<string, unknown>>,
+          component: HypeComposition as unknown as FC<Record<string, unknown>>,
           durationInFrames: config.durationInFrames,
           fps: config.fps,
           width: COMP_WIDTH,
@@ -218,6 +218,8 @@ function ReadyView({
         },
         inputProps: hypeProps as unknown as Record<string, unknown>,
         licenseKey: "free-license",
+        hardwareAcceleration: "prefer-hardware",
+        videoBitrate: "low",
         signal: abortRef.current.signal,
         onProgress: ({ renderedFrames }) => {
           setRenderState({
@@ -269,6 +271,7 @@ function ReadyView({
   };
 
   const fileTreeProps: FileTreeTimelapseProps = {
+    commits: timeline.commits,
     keyframes,
     totalCommits: timeline.totalCommits,
   };
@@ -512,7 +515,7 @@ function ScenePlayer({
 }: {
   component: FC<Record<string, unknown>>;
   durationInFrames: number;
-  inputProps: Record<string, unknown>;
+  inputProps: object;
   label: string;
 }) {
   return (

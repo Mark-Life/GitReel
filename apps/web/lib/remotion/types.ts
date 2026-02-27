@@ -116,6 +116,7 @@ export interface CodeRainProps {
 export interface GitReelProps {
   keyframes: TreemapKeyframe[];
   timeline: VideoTimeline;
+  timings?: HypeSceneTimings;
 }
 
 /* ── Hype composition types ─────────────────────────────── */

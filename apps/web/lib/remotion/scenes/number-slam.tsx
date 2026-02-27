@@ -46,7 +46,10 @@ export function NumberSlam({
     stats.length - 1
   );
   const localFrame = frame - currentIndex * framesPerStat;
-  const stat = stats[currentIndex];
+  const stat = stats[currentIndex] ?? stats[0];
+  if (!stat) {
+    return null;
+  }
 
   const scale = spring({
     frame: localFrame,

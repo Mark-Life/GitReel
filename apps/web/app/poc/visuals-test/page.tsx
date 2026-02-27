@@ -185,6 +185,7 @@ function ReadyView({
   };
 
   const fileTreeProps: FileTreeTimelapseProps = {
+    commits: timeline.commits,
     keyframes,
     totalCommits: timeline.totalCommits,
   };
@@ -286,7 +287,7 @@ function ScenePlayer({
 }: {
   component: FC<Record<string, unknown>>;
   durationInFrames: number;
-  inputProps: Record<string, unknown>;
+  inputProps: object;
   label: string;
 }) {
   return (
