@@ -25,6 +25,8 @@ const VISIBLE_ROWS = 42;
 const VISIBLE_HEIGHT = VISIBLE_ROWS * ROW_HEIGHT;
 const TOP_PADDING = 60;
 const MIN_FRAMES_PER_KF = 4;
+const SCROLL_TRANSITION_FRAMES = 8;
+const RENDER_BUFFER = 3;
 const GUTTER_WIDTH = 3;
 const COMMIT_MSG_MAX_LEN = 50;
 
@@ -187,6 +189,14 @@ export function FileTreeTimelapse({
     [kfIndex, keyframes, commitMap]
   );
 
+  const prevScrollY = useMemo(() => {
+    if (kfIndex <= 0) {
+      return null;
+    }
+    const prev = computeSegment(keyframes, kfIndex - 1, commitMap);
+    return prev?.scrollY ?? null;
+  }, [kfIndex, keyframes, commitMap]);
+
   if (!segmentData) {
     return <AbsoluteFill style={{ backgroundColor: "#0d1117" }} />;
   }
@@ -196,11 +206,21 @@ export function FileTreeTimelapse({
     newEntryIndices,
     newIndicesArray,
     modifiedEntryIndices,
-    scrollY,
+    scrollY: targetScrollY,
     fileCount,
     truncatedMsg,
     date,
   } = segmentData;
+
+  const scrollY =
+    prevScrollY !== null
+      ? interpolate(
+          localFrame,
+          [0, SCROLL_TRANSITION_FRAMES],
+          [prevScrollY, targetScrollY],
+          { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+        )
+      : targetScrollY;
 
   const commitCount = Math.floor(
     interpolate(frame, [0, durationInFrames], [0, totalCommits], {
@@ -230,25 +250,40 @@ export function FileTreeTimelapse({
           overflow: "hidden",
         }}
       >
-        <div
-          style={{
-            transform: `translateY(-${scrollY}px)`,
-            transition: "transform 0.3s ease-out",
-          }}
-        >
-          {entries.map((entry, i) => (
-            <FileRow
-              entry={entry}
-              fps={fps}
-              isModified={modifiedEntryIndices.has(i)}
-              isNew={newEntryIndices.has(i)}
-              key={entry.path}
-              localFrame={localFrame}
-              segmentFrames={segmentFrames}
-              staggerIndex={newIndicesArray.indexOf(i)}
-            />
-          ))}
-        </div>
+        {(() => {
+          const scrollRow = Math.floor(scrollY / ROW_HEIGHT);
+          const prevRow =
+            prevScrollY !== null
+              ? Math.floor(prevScrollY / ROW_HEIGHT)
+              : scrollRow;
+          const minRow = Math.min(scrollRow, prevRow);
+          const maxRow = Math.max(scrollRow, prevRow);
+          const startIdx = Math.max(0, minRow - RENDER_BUFFER);
+          const endIdx = Math.min(
+            entries.length,
+            maxRow + VISIBLE_ROWS + RENDER_BUFFER
+          );
+          const offsetY = startIdx * ROW_HEIGHT - scrollY;
+          return (
+            <div style={{ transform: `translateY(${offsetY}px)` }}>
+              {entries.slice(startIdx, endIdx).map((entry, localI) => {
+                const i = startIdx + localI;
+                return (
+                  <FileRow
+                    entry={entry}
+                    fps={fps}
+                    isModified={modifiedEntryIndices.has(i)}
+                    isNew={newEntryIndices.has(i)}
+                    key={entry.path}
+                    localFrame={localFrame}
+                    segmentFrames={segmentFrames}
+                    staggerIndex={newIndicesArray.indexOf(i)}
+                  />
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Date overlay */}
