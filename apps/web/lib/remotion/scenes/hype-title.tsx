@@ -25,10 +25,6 @@ export function HypeTitle({ meta }: HypeTitleProps) {
     config: { damping: 8, mass: 0.8, stiffness: 200 },
   });
 
-  const aberration = interpolate(frame, [0, 20], [4, 0], {
-    extrapolateRight: "clamp",
-  });
-
   const opacity = interpolate(frame, [0, 4], [0, 1], {
     extrapolateRight: "clamp",
   });
@@ -68,36 +64,7 @@ export function HypeTitle({ meta }: HypeTitleProps) {
           padding: "0 40px",
         }}
       >
-        {/* Red layer (left offset) */}
-        <span
-          style={{
-            ...textStyle,
-            color: "rgba(255,60,60,0.7)",
-            position: "absolute",
-            left: -aberration,
-            top: 0,
-          }}
-        >
-          {meta.fullName}
-        </span>
-
-        {/* Cyan layer (right offset) */}
-        <span
-          style={{
-            ...textStyle,
-            color: "rgba(60,255,255,0.7)",
-            position: "absolute",
-            left: aberration,
-            top: 0,
-          }}
-        >
-          {meta.fullName}
-        </span>
-
-        {/* White center layer */}
-        <span style={{ ...textStyle, color: "white", position: "relative" }}>
-          {meta.fullName}
-        </span>
+        <span style={{ ...textStyle, color: "white" }}>{meta.fullName}</span>
       </div>
     </AbsoluteFill>
   );
