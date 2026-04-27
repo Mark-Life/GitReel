@@ -1,64 +1,58 @@
-# Next.js Monorepo Template
+# GitReel
 
-A turborepo-based monorepo template with Next.js, shadcn/ui, and strict code quality via Ultracite.
+Generate animated video recaps of GitHub repositories — visualizing commits, contributors, languages, and file structure evolution over time. Think "Spotify Wrapped" but for your repo.
 
-## What's Inside
+## How It Works
 
-- `apps/web` — Next.js application
-- `packages/ui` — shared shadcn/ui component library
-- `packages/typescript-config` — shared TypeScript configs
+1. Paste a GitHub repo URL
+2. GitReel fetches the repo timeline (commits, contributors, languages, file trees)
+3. Remotion renders an animated video with multiple scenes
+
+## Scenes
+
+- **Title Card** — repo name, stars, commit count
+- **Treemap Timelapse** — file structure evolving over commits
+- **Stats Explosion** — languages, contributors, repo age
+- **Number Slam** — key metrics with animated counters
+- **Before/After** — file tree comparison (first vs latest)
+- **Boss Entry** — top contributors showcase
+- **Wrapped Card** — summary card
+- **Outro** — closing with repo info
+
+## Architecture
+
+```
+apps/web          — Next.js app with Remotion player
+packages/github   — GitHub API client (Effect-based, Octokit)
+packages/api      — oRPC router exposing timeline endpoint
+packages/ui       — shared UI components (shadcn/ui)
+```
 
 ## Stack
 
 - **Runtime**: Bun
+- **Framework**: Next.js (App Router)
+- **Video**: Remotion
+- **API**: oRPC
+- **GitHub Client**: Effect + Octokit
 - **Build**: Turborepo
-- **Linting/Formatting**: Ultracite (Biome)
+- **Linting**: Ultracite (Biome)
 - **UI**: shadcn/ui + Tailwind CSS
-- **Pre-commit**: Husky + Ultracite
 
-## Create a New Project
-
-Using GitHub CLI:
+## Getting Started
 
 ```bash
-gh repo create my-app --template Mark-Life/netxjs-monorepo --private --clone
-cd my-app
 bun install
-bun run upgrade
+bun dev
 ```
 
-Or from GitHub UI: click **"Use this template"** > **"Create a new repository"**, then:
-
-```bash
-git clone https://github.com/YOUR_USERNAME/my-app.git
-cd my-app
-bun install
-bun run upgrade
-```
-
-The `upgrade` command updates Next.js, refreshes all shadcn/ui components, updates dependencies, and runs lint fixes.
+Set `GITHUB_TOKEN` in `apps/web/.env.local` for higher API rate limits.
 
 ## Commands
 
 | Command | Description |
 | --- | --- |
-| `bun dev` | Start all apps in dev mode |
+| `bun dev` | Start dev server |
 | `bun run build` | Build all apps and packages |
-| `bun run lint` | Lint all apps and packages |
+| `bun run lint` | Lint everything |
 | `bun run fix` | Auto-fix formatting and lint issues |
-| `bun run check` | Check for lint/format issues |
-| `bun run upgrade` | Upgrade Next.js, shadcn/ui, and all deps |
-
-## Adding Components
-
-Add shadcn/ui components to the shared `ui` package:
-
-```bash
-bunx shadcn@latest add button -c packages/ui
-```
-
-Then import from `@workspace/ui`:
-
-```tsx
-import { Button } from "@workspace/ui/components/button"
-```
